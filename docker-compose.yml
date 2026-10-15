@@ -1,0 +1,34 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: pasaporteba-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: pasaporteba
+      MYSQL_USER: pasaporte
+      MYSQL_PASSWORD: pasaporte
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
+    ports:
+      - "3307:3306"   # 3307 en la PC porque el 3306 ya lo usa un MySQL local
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      retries: 20
+
+  hbase:
+    # HBase standalone (incluye ZooKeeper embebido, Thrift en 9090 y REST en 8080)
+    image: harisekhon/hbase:2.1
+    container_name: pasaporteba-hbase
+    hostname: hbase
+    ports:
+      - "16010:16010" # UI web del Master
+      - "9090:9090"   # Thrift (lo usa el backend con happybase)
+      - "8080:8080"   # REST (opcional)
+    volumes:
+      - hbase_data:/hbase-data
+
+volumes:
+  mysql_data:
+  hbase_data:

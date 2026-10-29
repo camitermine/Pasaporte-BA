@@ -18,6 +18,7 @@ from app.config import settings
 from app.persistencia.hbase import geohash
 from app.persistencia.hbase.claves import a_celdas, clave, pad, rev_ts
 from app.persistencia.hbase.esquema import crear_tablas
+from app.persistencia.mysql.cuentas import hash_password
 
 random.seed(42)
 
@@ -141,13 +142,24 @@ def cargar_mysql(barrios, categorias, lugares, usuarios, checkins):
             [{"id": c_[0], "nombre": c_[1], "tipo": c_[2]} for c_ in categorias])
         ins("INSERT INTO fuente (id_fuente, nombre, url) VALUES (:id, :nombre, :url)",
             [{"id": i + 1, "nombre": n, "url": u} for i, (n, u) in enumerate(FUENTES)])
-        ins("""INSERT INTO lugar VALUES (:id, :nombre, :direccion, :lat, :lon, :id_categoria,
-               :id_barrio, :id_fuente, :id_origen)""", lugares)
-        ins("""INSERT INTO usuario VALUES (:id, :nombre_usuario, :nombre, :email, :id_barrio, :fecha_alta)""",
-            usuarios)
-        ins("""INSERT INTO checkin VALUES (:id, :id_usuario, :id_lugar, :fecha_hora, :puntaje, :comentario)""",
-            checkins)
+        ins("""INSERT INTO lugar
+               (id_lugar, nombre, direccion, latitud, longitud, id_categoria, id_barrio, id_fuente, id_origen)
+               VALUES (:id, :nombre, :direccion, :lat, :lon, :id_categoria,
+                       :id_barrio, :id_fuente, :id_origen)""", lugares)
+        password_demo = hash_password("demo1234")
+        usuarios_sql = [
+            {**u, "password_hash": password_demo, "rol": "admin" if u["id"] == 1 else "usuario"}
+            for u in usuarios
+        ]
+        ins("""INSERT INTO usuario
+               (id_usuario, nombre_usuario, nombre, email, password_hash, rol, id_barrio, fecha_alta)
+               VALUES (:id, :nombre_usuario, :nombre, :email, :password_hash, :rol, :id_barrio, :fecha_alta)""",
+            usuarios_sql)
+        ins("""INSERT INTO checkin
+               (id_checkin, id_usuario, id_lugar, fecha_hora, puntaje, comentario)
+               VALUES (:id, :id_usuario, :id_lugar, :fecha_hora, :puntaje, :comentario)""", checkins)
     print(f"MySQL: {len(lugares)} lugares, {len(usuarios)} usuarios, {len(checkins)} check-ins")
+    print(f"Login demo: {usuarios[0]['nombre_usuario']} / demo1234 (admin); los demas / demo1234")
 
 
 def cargar_hbase(barrios, categorias, lugares, usuarios, checkins):

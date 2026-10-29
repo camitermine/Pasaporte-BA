@@ -1,120 +1,131 @@
 # Pasaporte BA
 
-App mobile para hacer check-in en bares, cafés, espacios culturales, monumentos y murales de la Ciudad de Buenos Aires.
-TP Integrador de Bases de Datos: el mismo backend trabaja con **MySQL** o con **HBase** (backend polimórfico).
+Aplicación móvil para descubrir puntos de interés de la Ciudad de Buenos Aires, guardarlos como
+favoritos y registrar visitas. Los usuarios pueden sugerir lugares; un administrador crea las
+cuentas, modera las propuestas y mantiene el catálogo.
 
-Diseño completo: [documentacion/DISENO.md](documentacion/DISENO.md)
+## Arquitectura
 
+```text
+Expo / React Native
+        │ HTTP + Bearer token
+        ▼
+FastAPI
+   ├── MySQL: usuarios, sesiones, roles, catálogo, favoritos, sugerencias y check-in canónico
+   └── HBase: historiales de check-in, pasaporte, índices y rankings
 ```
-App mobile (Expo)  ──HTTP + header X-Motor──>  Backend FastAPI  ──>  MySQL 8.4
-                                                                └──>  HBase 2.1 (Thrift)
+
+El usuario no selecciona una base. El backend decide qué motor corresponde y cada respuesta
+incluye `meta.motor` para poder identificarlo y explicarlo durante la presentación.
+
+## Datos
+
+El repositorio incluye los cuatro CSV recibidos en `database/datasets/tablas_3fn/`. El ETL:
+
+```powershell
+python database\etl\generar_datos_mysql.py
 ```
 
-## Requisitos
+genera `database/mysql/datos_iniciales.sql` con 8.322 lugares válidos, 48 barrios y 232 categorías
+de origen. Los CSV originales se conservan sin modificaciones. Durante la limpieza, el ETL:
 
-- Docker Desktop
-- Python 3.11 o superior
-- Node.js 20 o superior
-- Android con **Expo Go** instalado (Play Store), en la **misma red Wi-Fi** que la PC
+- Consolida las dos codificaciones de Núñez en un único barrio.
+- Omite 10 registros sin nombre y no inventa valores.
+- Conserva 270 lugares sin barrio con `id_barrio = NULL`.
+- Convierte coordenadas incompletas a `NULL`.
+- Corrige texto mal codificado cuando es recuperable.
+- Usa los tipos de origen como categorías agrupadas en cultura, patrimonio, arte urbano o
+  gastronomía.
 
-## 1. Levantar las bases
+El material recibido no contiene URL, fecha de descarga ni licencia de las cuatro fuentes; esos
+datos deben completarse antes de la entrega del informe.
 
-```bash
+## Puesta en marcha local
+
+Cada integrante trabaja con sus propias bases locales. Requisitos en la computadora:
+
+- Git.
+- Docker Desktop abierto.
+- Python 3.11 o superior.
+- Node.js 20 o superior.
+
+En el teléfono se necesita Expo Go compatible con SDK 58. El teléfono y la computadora deben
+estar conectados a la misma red Wi-Fi. Todos los comandos siguientes se ejecutan desde la raíz
+del repositorio en PowerShell.
+
+### 1. Bases de datos
+
+```powershell
 docker compose up -d
+Get-Content backend\dev\schema_mysql_dev.sql -Raw | docker exec -i pasaporteba-mysql mysql -upasaporte -ppasaporte pasaporteba
+Get-Content database\mysql\datos_iniciales.sql -Raw | docker exec -i pasaporteba-mysql mysql -upasaporte -ppasaporte pasaporteba
 ```
 
-| Servicio | Puerto en la PC | Notas |
-|---|---|---|
-| MySQL 8.4 | **3307** | usuario `pasaporte` / clave `pasaporte`, base `pasaporteba` (root: `root`) |
-| HBase (Thrift) | 9090 | lo usa el backend |
-| HBase (UI web) | 16010 | http://localhost:16010 |
+### 2. Backend
 
-> MySQL usa el 3307 porque el 3306 suele estar ocupado por un MySQL instalado localmente.
-> HBase tarda unos 30 a 60 segundos en estar listo después de `docker compose up`.
-
-## 2. Backend
-
-```bash
-cd backend
-python -m venv .venv
-.venv/Scripts/pip install -r requirements.txt     # en Linux/Mac: .venv/bin/pip
-cp .env.example .env
+```powershell
+python -m venv backend\.venv
+backend\.venv\Scripts\python -m pip install -r backend\requirements.txt
+Copy-Item backend\.env.example backend\.env
+backend\.venv\Scripts\python database\hbase\cargar_desde_mysql.py
+backend\.venv\Scripts\python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 --reload
 ```
 
-Cargar datos de **prueba** (sintéticos, los mismos IDs en los dos motores):
+Documentación interactiva: `http://localhost:8000/docs`.
 
-```bash
-.venv/Scripts/python -m dev.seed_dev
-```
+### 3. Aplicación móvil
 
-Levantar la API (escucha en toda la red para que la vea el celular):
-
-```bash
-.venv/Scripts/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-- Documentación interactiva: http://localhost:8000/docs
-- El motor se elige por request con el header `X-Motor: mysql | hbase` (o `?motor=`); el valor por defecto está en `MOTOR_DB` del `.env`.
-
-Comparar los dos motores (mismas consultas, resultados y tiempos):
-
-```bash
-.venv/Scripts/python -m dev.comparar_motores
-```
-
-## 3. App mobile
-
-```bash
-cd frontend
-npm install
+```powershell
+Set-Location frontend
+npm ci
 npx expo start
 ```
 
-1. Abrí **Expo Go** en el Android y escaneá el QR que aparece en la terminal.
-2. La app usa automáticamente la IP de la PC para llegar al backend (`http://<ip-de-la-pc>:8000`). Si no conecta, cambiala en **Ajustes → Backend**.
-3. En **Ajustes** elegí un usuario y el motor (también se cambia tocando el botón de motor del encabezado).
+Expo muestra un código QR. Hay que escanearlo con Expo Go desde un teléfono conectado a la misma
+red. La app calcula la URL del backend con la IP usada por Expo; también se puede modificar desde
+`Ajustes`. Si Windows pregunta por el firewall, se debe permitir el acceso de Node y Python en
+redes privadas.
 
-### Si el celular no conecta
+## Cuentas iniciales
 
-La PC y el celular tienen que estar conectados **al mismo router**. La PC puede estar por cable, eso no importa.
+| Rol | Usuario | Contraseña |
+|---|---|---|
+| Administrador | `admin` | `Admin123!` |
+| Usuario | `visitante` | `Usuario123!` |
 
-1. Buscá la IP de la PC con `ipconfig` (la que empieza con `192.168.`).
-2. En el navegador del celular abrí `http://<ip-de-la-pc>:8000/motores`. Si ves un JSON, la red está bien.
-3. Si no carga, revisá estas causas:
-   - El **Firewall de Windows** bloquea los puertos 8000 y 8081. Cuando Windows pregunte, permití Python y Node en redes privadas.
-   - El celular está en la red de **invitados** del router, que aísla a los dispositivos entre sí.
-   - El celular está en otra red (datos móviles, un repetidor con otro rango de IPs).
+Son credenciales locales de demostración. Las cuentas nuevas solo pueden ser creadas por un
+administrador y las contraseñas se guardan con PBKDF2-SHA256 y salt aleatorio.
 
-### Alternativa por cable USB (no depende de la red)
+## Funcionalidades actuales
 
-1. En el Android, activá las Opciones de desarrollador y, dentro de ellas, la **Depuración USB**.
-2. Conectalo a la PC (hace falta `adb`, que viene en Android platform-tools).
-3. Redirigí los puertos del celular a la PC:
-   ```bash
-   adb reverse tcp:8000 tcp:8000
-   ```
-   ```bash
-   adb reverse tcp:8081 tcp:8081
-   ```
-4. En la app, en **Ajustes → Backend**, poné `http://localhost:8000`.
+- Login real con sesiones revocables y roles.
+- Exploración y búsqueda por barrio o categoría.
+- Mapa de lugares cercanos mediante la ubicación del dispositivo.
+- Favoritos.
+- Check-ins sin foto, marcados como no verificados.
+- Pasaporte de barrios y ranking mensual.
+- Sugerencias de lugares y moderación administrativa.
+- Alta, modificación y baja lógica de lugares solo para administradores.
+- Indicador del motor que resolvió cada operación, sin selector para el usuario.
 
-También se puede probar en el navegador: `npx expo start --web`.
+## Verificación
 
-## Estructura
+```powershell
+Set-Location frontend
+npx tsc --noEmit
+npx eslint .
 
+Set-Location ..
+python -m compileall -q backend\app backend\dev database\etl database\hbase
 ```
-backend/
-  app/
-    api.py                  rutas HTTP (no conocen el motor)
-    dominio.py              modelos que expone la API
-    persistencia/
-      base.py               interfaces (repositorios abstractos)
-      fabrica.py            elige la implementación según el motor
-      mysql/repos.py        implementación MySQL (SQL explícito)
-      hbase/repos.py        implementación HBase (row keys, tablas índice, contadores)
-  dev/                      esquema y datos de prueba para desarrollo, comparación de motores
-frontend/                   app Expo (React Native + expo-router)
-database/                   scripts oficiales del TP (modelo relacional, carga, HBase)
-documentacion/              informe, DER, documento de diseño
-docker-compose.yml
+
+La comparación es una herramienta interna del TP; no aparece como selector en la app. Con ambas
+bases cargadas se ejecutan las mismas lecturas y se verifican resultados y medianas de tiempo:
+
+```powershell
+Set-Location backend
+.venv\Scripts\python -m dev.comparar_motores --usuario 1 --lugar 1 --barrio 1 --mes 2026-10 --repeticiones 10
 ```
+
+Antes de sacar conclusiones de rendimiento hay que generar un volumen representativo de
+check-ins y repetir las mediciones en condiciones controladas.

@@ -8,11 +8,13 @@ import { ScrollView, Text, View } from 'react-native';
 import { Selector } from '@/components/Selector';
 import { avisar, Boton, Campo, Estado, s } from '@/components/ui';
 import { mensajeError, useApi, useCarga, volver } from '@/lib/api';
+import { useConfig } from '@/lib/config';
 import type { Barrio, Categoria, Lugar, LugarIn } from '@/lib/tipos';
 
 export default function FormLugar() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const api = useApi();
+  const { usuario } = useConfig();
   const editando = !!id;
 
   const [nombre, setNombre] = useState('');
@@ -36,12 +38,14 @@ export default function FormLugar() {
   const lugar = datos.datos?.lugar;
   useEffect(() => {
     if (!lugar) return;
+    // El formulario local se inicializa cuando termina la carga del registro.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNombre(lugar.nombre);
     setDireccion(lugar.direccion ?? '');
     setLat(lugar.latitud !== null ? String(lugar.latitud) : '');
     setLon(lugar.longitud !== null ? String(lugar.longitud) : '');
     setIdCategoria(lugar.categoria.id);
-    setIdBarrio(lugar.barrio.id);
+    setIdBarrio(lugar.barrio?.id ?? null);
   }, [lugar?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const usarUbicacion = async () => {
@@ -84,6 +88,9 @@ export default function FormLugar() {
     }
   };
 
+  if (usuario?.rol !== 'admin') {
+    return <View style={[s.pantalla, s.contenido]}><Text>Solo un administrador puede modificar el catálogo.</Text></View>;
+  }
   if (!datos.datos) {
     return <View style={s.pantalla}><Estado cargando={datos.cargando} error={datos.error} onReintentar={datos.recargar} /></View>;
   }

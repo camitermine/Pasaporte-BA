@@ -8,10 +8,12 @@ import { ItemLugar } from '@/components/Items';
 import { Selector } from '@/components/Selector';
 import { colores, Estado, s } from '@/components/ui';
 import { qs, useApi, useCarga, usePaginado } from '@/lib/api';
+import { useConfig } from '@/lib/config';
 import type { Barrio, Categoria, Lugar } from '@/lib/tipos';
 
 export default function Explorar() {
   const api = useApi();
+  const { usuario } = useConfig();
   const [texto, setTexto] = useState('');
   const [q, setQ] = useState('');
   const [barrio, setBarrio] = useState<number | null>(null);
@@ -69,8 +71,12 @@ export default function Explorar() {
                 textoVacio="Todas"
               />
             </View>
-            <Pressable onPress={() => router.push('/lugar/form')} style={[s.tarjeta, { borderStyle: 'dashed', borderColor: colores.primario, alignItems: 'center' }]}>
-              <Text style={{ color: colores.primario, fontWeight: '700' }}>＋ Agregar un lugar</Text>
+            <Pressable
+              onPress={() => router.push(usuario?.rol === 'admin' ? '/lugar/form' : '/sugerencia/form')}
+              style={[s.tarjeta, { borderStyle: 'dashed', borderColor: colores.primario, alignItems: 'center' }]}>
+              <Text style={{ color: colores.primario, fontWeight: '700' }}>
+                {usuario?.rol === 'admin' ? '+ Agregar un lugar' : '+ Sugerir un lugar'}
+              </Text>
             </Pressable>
           </View>
         }

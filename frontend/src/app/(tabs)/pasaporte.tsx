@@ -4,23 +4,14 @@ import { router } from 'expo-router';
 import { FlatList, Text, View } from 'react-native';
 
 import { ItemCheckin } from '@/components/Items';
-import { Boton, Chip, colores, Estado, s, Tarjeta } from '@/components/ui';
+import { Chip, colores, Estado, s, Tarjeta } from '@/components/ui';
 import { qs, useApi, useCarga, usePaginado } from '@/lib/api';
 import { useConfig } from '@/lib/config';
 import type { Checkin, Pasaporte } from '@/lib/tipos';
 
 export default function PasaporteScreen() {
-  const { idUsuario } = useConfig();
-  if (idUsuario === null) {
-    return (
-      <View style={[s.pantalla, s.contenido, { justifyContent: 'center' }]}>
-        <Text style={[s.titulo, { textAlign: 'center' }]}>¿Quién sos?</Text>
-        <Text style={[s.suave, { textAlign: 'center', marginBottom: 16 }]}>Elegí un usuario en Ajustes para ver tu pasaporte.</Text>
-        <Boton titulo="Ir a Ajustes" onPress={() => router.push('/ajustes')} />
-      </View>
-    );
-  }
-  return <Contenido idUsuario={idUsuario} />;
+  const { usuario } = useConfig();
+  return usuario ? <Contenido idUsuario={usuario.id} /> : null;
 }
 
 function Contenido({ idUsuario }: { idUsuario: number }) {

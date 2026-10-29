@@ -8,9 +8,13 @@ import { colores } from '@/components/ui';
 
 type Icono = ComponentProps<typeof Ionicons>['name'];
 
-const icono = (nombre: Icono) => ({ color, size }: { color: ColorValue; size: number }) => (
-  <Ionicons name={nombre} color={color as string} size={size} />
-);
+const icono = (nombre: Icono) => {
+  const IconoTab = ({ color, size }: { color: ColorValue; size: number }) => (
+    <Ionicons name={nombre} color={color as string} size={size} />
+  );
+  IconoTab.displayName = `IconoTab(${nombre})`;
+  return IconoTab;
+};
 
 export default function TabsLayout() {
   return (

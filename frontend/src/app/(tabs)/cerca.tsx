@@ -4,6 +4,7 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Text, View } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 
 import { ItemLugar } from '@/components/Items';
 import { Boton, Chip, Estado, s } from '@/components/ui';
@@ -62,9 +63,28 @@ export default function Cerca() {
               ))}
             </View>
             {punto && (
-              <Text style={[s.suave, { marginBottom: 8 }]}>
-                Desde {punto.nombre} ({punto.lat.toFixed(4)}, {punto.lon.toFixed(4)})
-              </Text>
+              <>
+                <Text style={[s.suave, { marginBottom: 8 }]}>
+                  Desde {punto.nombre} ({punto.lat.toFixed(4)}, {punto.lon.toFixed(4)})
+                </Text>
+                <MapView
+                  style={{ height: 300, borderRadius: 12, marginBottom: 16 }}
+                  region={{
+                    latitude: punto.lat, longitude: punto.lon,
+                    latitudeDelta: Math.max(0.012, radio / 55_000),
+                    longitudeDelta: Math.max(0.012, radio / 45_000),
+                  }}
+                  showsUserLocation={punto.nombre === 'Mi ubicación'}>
+                  <Marker coordinate={{ latitude: punto.lat, longitude: punto.lon }} title={punto.nombre} pinColor="#2563EB" />
+                  {(resultado.datos ?? []).filter((x) => x.lugar.latitud !== null && x.lugar.longitud !== null).map((x) => (
+                    <Marker key={x.lugar.id}
+                      coordinate={{ latitude: x.lugar.latitud!, longitude: x.lugar.longitud! }}
+                      title={x.lugar.nombre}
+                      description={`${x.lugar.categoria.nombre} · ${Math.round(x.distancia_m)} m`}
+                      onCalloutPress={() => router.push(`/lugar/${x.lugar.id}`)} />
+                  ))}
+                </MapView>
+              </>
             )}
           </View>
         }

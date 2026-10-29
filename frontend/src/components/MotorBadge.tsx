@@ -1,20 +1,21 @@
-// Indicador del motor activo en el encabezado. Tocándolo se cambia de motor.
+// Identifica el motor que respondio el ultimo pedido. No es un selector.
 
-import { Pressable, Text } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useConfig } from '@/lib/config';
 import { colorMotor, colores } from './ui';
 
 export function MotorBadge() {
-  const { motor, cambiar } = useConfig();
+  const { historial } = useConfig();
+  const motor = historial[0]?.meta.motor;
   return (
-    <Pressable
-      onPress={() => cambiar({ motor: motor === 'mysql' ? 'hbase' : 'mysql' })}
-      hitSlop={8}
-      style={{ backgroundColor: colorMotor(motor), borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, marginRight: 12 }}>
+    <View style={{
+      backgroundColor: motor ? colorMotor(motor) : colores.suave,
+      borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, marginRight: 12,
+    }}>
       <Text style={{ color: colores.blanco, fontWeight: '800', fontSize: 12, letterSpacing: 0.5 }}>
-        {motor === 'mysql' ? 'MySQL' : 'HBase'} ⇄
+        {motor ? motor.toUpperCase() : 'AUTO'}
       </Text>
-    </Pressable>
+    </View>
   );
 }

@@ -12,7 +12,7 @@ export function ItemLugar({ lugar, extra, onPress }: { lugar: Lugar; extra?: str
       <View style={{ flex: 1 }}>
         <Text style={{ fontWeight: '700', color: colores.texto, fontSize: 15 }} numberOfLines={1}>{lugar.nombre}</Text>
         <Text style={s.suave} numberOfLines={1}>
-          {lugar.categoria.nombre} · {lugar.barrio.nombre}
+          {lugar.categoria.nombre} · {lugar.barrio?.nombre ?? 'Barrio sin definir'}
         </Text>
         {lugar.direccion ? <Text style={s.suave} numberOfLines={1}>{lugar.direccion}</Text> : null}
       </View>

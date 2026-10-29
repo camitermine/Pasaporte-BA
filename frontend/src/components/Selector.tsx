@@ -76,7 +76,7 @@ export function Selector({
                 <Pressable onPress={() => elegir(null)} style={[s.tarjeta, valor === null && { borderColor: colores.primario }]}>
                   <Text style={{ color: colores.suave }}>{textoVacio}</Text>
                 </Pressable>
-              ) : null
+              ) : undefined
             }
             renderItem={({ item }) => (
               <Pressable onPress={() => elegir(item.id)} style={[s.tarjeta, item.id === valor && { borderColor: colores.primario }]}>

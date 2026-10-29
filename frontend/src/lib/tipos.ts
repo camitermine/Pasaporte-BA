@@ -37,8 +37,9 @@ export interface Lugar {
   latitud: number | null;
   longitud: number | null;
   categoria: Categoria;
-  barrio: Barrio;
+  barrio: Barrio | null;
   fuente: string | null;
+  activo: boolean;
 }
 
 export interface LugarIn {
@@ -47,7 +48,7 @@ export interface LugarIn {
   latitud: number | null;
   longitud: number | null;
   id_categoria: number;
-  id_barrio: number;
+  id_barrio: number | null;
 }
 
 export interface LugarCercano {
@@ -62,6 +63,13 @@ export interface Usuario {
   email: string;
   barrio: Barrio | null;
   fecha_alta: string;
+  rol: 'usuario' | 'admin';
+  activo: boolean;
+}
+
+export interface Sesion {
+  token: string;
+  usuario: Usuario;
 }
 
 export interface Checkin {
@@ -71,6 +79,7 @@ export interface Checkin {
   fecha_hora: string;
   puntaje: number | null;
   comentario: string | null;
+  verificado: boolean;
 }
 
 export interface Pagina<T> {
@@ -92,4 +101,22 @@ export interface Pasaporte {
   barrios_visitados: { barrio: Barrio; checkins: number }[];
   barrios_faltantes: Barrio[];
   progreso: number;
+}
+
+export interface SugerenciaLugar {
+  id: number;
+  usuario: Ref;
+  nombre: string;
+  direccion: string | null;
+  latitud: number | null;
+  longitud: number | null;
+  categoria: Categoria;
+  barrio: Barrio | null;
+  comentario: string | null;
+  estado: 'pendiente' | 'aprobada' | 'rechazada';
+  fecha_alta: string;
+  revisor: Ref | null;
+  fecha_revision: string | null;
+  motivo_revision: string | null;
+  id_lugar_creado: number | null;
 }

@@ -4,15 +4,13 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
-import { avisar, Boton, Campo, colores, confirmar, Estado, Estrellas, formatearFecha, s, Tarjeta } from '@/components/ui';
+import { avisar, Boton, Campo, confirmar, Estado, Estrellas, formatearFecha, s, Tarjeta } from '@/components/ui';
 import { mensajeError, useApi, useCarga, volver } from '@/lib/api';
-import { useConfig } from '@/lib/config';
 import type { Checkin, Lugar } from '@/lib/tipos';
 
 export default function FormCheckin() {
   const { id, idLugar } = useLocalSearchParams<{ id?: string; idLugar?: string }>();
   const api = useApi();
-  const { idUsuario } = useConfig();
   const editando = !!id;
 
   const [puntaje, setPuntaje] = useState<number | null>(null);
@@ -31,6 +29,8 @@ export default function FormCheckin() {
   const checkin = datos.datos?.checkin;
   useEffect(() => {
     if (!checkin) return;
+    // El formulario local se inicializa cuando termina la carga del registro.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPuntaje(checkin.puntaje);
     setComentario(checkin.comentario ?? '');
   }, [checkin?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -40,7 +40,7 @@ export default function FormCheckin() {
     const cambios = { puntaje, comentario: comentario.trim() || null };
     try {
       if (editando) await api.put(`/checkins/${id}`, cambios);
-      else await api.post('/checkins', { ...cambios, id_usuario: idUsuario, id_lugar: Number(idLugar) });
+      else await api.post('/checkins', { ...cambios, id_lugar: Number(idLugar) });
       volver(`/lugar/${datos.datos?.lugar.id ?? ''}`);
     } catch (e) {
       avisar('No se pudo guardar', mensajeError(e));
@@ -69,7 +69,7 @@ export default function FormCheckin() {
       <Stack.Screen options={{ title: editando ? 'Editar check-in' : 'Nuevo check-in' }} />
       <Tarjeta>
         <Text style={s.titulo}>{lugar.nombre}</Text>
-        <Text style={s.suave}>{lugar.categoria.nombre} · {lugar.barrio.nombre}</Text>
+        <Text style={s.suave}>{lugar.categoria.nombre} · {lugar.barrio?.nombre ?? 'Barrio sin definir'}</Text>
         {checkin && <Text style={[s.suave, { marginTop: 4 }]}>Check-in del {formatearFecha(checkin.fecha_hora)}</Text>}
       </Tarjeta>
 
@@ -84,12 +84,8 @@ export default function FormCheckin() {
         multiline
         placeholder="¿Qué te pareció?"
       />
-      <Boton titulo={editando ? 'Guardar cambios' : '✓ Hacer check-in'} onPress={guardar} cargando={guardando}
-        deshabilitado={!editando && !idUsuario} />
+      <Boton titulo={editando ? 'Guardar cambios' : '✓ Hacer check-in'} onPress={guardar} cargando={guardando} />
       {editando && <Boton titulo="Borrar check-in" variante="peligro" onPress={borrar} estilo={{ marginTop: 8 }} />}
-      {!editando && !idUsuario && (
-        <Text style={{ color: colores.peligro, marginTop: 8 }}>Elegí un usuario en Ajustes primero.</Text>
-      )}
     </ScrollView>
   );
 }

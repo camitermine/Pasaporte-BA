@@ -336,6 +336,7 @@ def _a_checkin(id_checkin: int, d: dict[str, str]) -> Checkin:
         puntaje=int(d["puntaje"]) if "puntaje" in d else None, comentario=d.get("comentario"),
         usuario=Ref(id=int(d["id_usuario"]), nombre=d["nombre_usuario"]),
         lugar=Ref(id=int(d["id_lugar"]), nombre=d["nombre_lugar"]),
+        verificado=d.get("verificado", "False").lower() == "true",
     )
 
 
@@ -368,6 +369,23 @@ class CheckinsHBase(_BaseHBase, RepoCheckins):
         self._incrementar("stats_lugar", clave(datos.id_lugar), f"m:{fecha:%Y%m}".encode())
         self._incrementar("stats_lugar", clave(datos.id_lugar), b"t:total")
         return self.obtener(id_checkin)
+
+    def replicar(self, checkin: Checkin, id_barrio: int, barrio: str) -> Checkin:
+        """Proyecta en HBase un check-in cuyo ID fue asignado por MySQL."""
+        if self._get("checkins", clave(checkin.id)):
+            return self.obtener(checkin.id)
+        fila = a_celdas({
+            "id_usuario": checkin.usuario.id, "nombre_usuario": checkin.usuario.nombre,
+            "id_lugar": checkin.lugar.id, "nombre_lugar": checkin.lugar.nombre,
+            "id_barrio": id_barrio, "barrio": barrio,
+            "fecha_hora": checkin.fecha_hora, "puntaje": checkin.puntaje,
+            "comentario": checkin.comentario, "verificado": checkin.verificado,
+        })
+        for tabla, k in self._claves(checkin.id, checkin.usuario.id, checkin.lugar.id, checkin.fecha_hora):
+            self._put(tabla, k, fila)
+        self._incrementar("stats_lugar", clave(checkin.lugar.id), f"m:{checkin.fecha_hora:%Y%m}".encode())
+        self._incrementar("stats_lugar", clave(checkin.lugar.id), b"t:total")
+        return self.obtener(checkin.id)
 
     def actualizar(self, id_checkin: int, cambios: CheckinCambios) -> Checkin:
         d = self._crudo(id_checkin)

@@ -31,6 +31,14 @@ class MotorNoDisponible(Exception):
     """No se pudo conectar con la base (503)."""
 
 
+class NoAutorizado(Exception):
+    """Falta una sesion valida (401)."""
+
+
+class Prohibido(Exception):
+    """El usuario autenticado no tiene permiso para la operacion (403)."""
+
+
 @dataclass
 class Traza:
     """Registro de las operaciones que se ejecutaron contra la base en una request."""

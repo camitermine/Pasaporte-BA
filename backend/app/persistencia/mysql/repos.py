@@ -72,11 +72,11 @@ class CatalogoMySQL(_BaseMySQL, RepoCatalogo):
 _SELECT_LUGAR = """
     SELECT l.id_lugar, l.nombre, l.direccion, l.latitud, l.longitud,
            c.id_categoria, c.nombre AS categoria, t.nombre AS tipo,
-           b.id_barrio, b.nombre AS barrio, b.id_comuna, f.nombre AS fuente
+           b.id_barrio, b.nombre AS barrio, b.id_comuna, f.nombre AS fuente, l.activo
     FROM lugar l
     JOIN categoria c  ON c.id_categoria = l.id_categoria
     JOIN tipo_lugar t ON t.id_tipo = c.id_tipo
-    JOIN barrio b     ON b.id_barrio = l.id_barrio
+    LEFT JOIN barrio b ON b.id_barrio = l.id_barrio
     LEFT JOIN fuente f ON f.id_fuente = l.id_fuente
 """
 
@@ -87,14 +87,15 @@ def _a_lugar(f: dict) -> Lugar:
         latitud=float(f["latitud"]) if f["latitud"] is not None else None,
         longitud=float(f["longitud"]) if f["longitud"] is not None else None,
         categoria=Categoria(id=f["id_categoria"], nombre=f["categoria"], tipo=f["tipo"]),
-        barrio=Barrio(id=f["id_barrio"], nombre=f["barrio"], comuna=f["id_comuna"]),
-        fuente=f["fuente"],
+        barrio=(Barrio(id=f["id_barrio"], nombre=f["barrio"], comuna=f["id_comuna"])
+                if f["id_barrio"] is not None else None),
+        fuente=f["fuente"], activo=bool(f["activo"]),
     )
 
 
 class LugaresMySQL(_BaseMySQL, RepoLugares):
     def listar(self, filtro: FiltroLugares, limite: int, cursor: str | None) -> Pagina[Lugar]:
-        condiciones, params = [], {"lim": limite + 1}
+        condiciones, params = ["l.activo = TRUE"], {"lim": limite + 1}
         if filtro.id_barrio is not None:
             condiciones.append("l.id_barrio = :barrio")
             params["barrio"] = filtro.id_barrio
@@ -114,7 +115,7 @@ class LugaresMySQL(_BaseMySQL, RepoLugares):
         return Pagina(items=items, siguiente_cursor=siguiente)
 
     def obtener(self, id_lugar: int) -> Lugar:
-        filas = self._ejecutar(f"{_SELECT_LUGAR} WHERE l.id_lugar = :id", {"id": id_lugar})
+        filas = self._ejecutar(f"{_SELECT_LUGAR} WHERE l.id_lugar = :id AND l.activo = TRUE", {"id": id_lugar})
         if not filas:
             raise NoEncontrado(f"No existe el lugar {id_lugar}")
         return _a_lugar(filas[0])
@@ -135,8 +136,9 @@ class LugaresMySQL(_BaseMySQL, RepoLugares):
         return self.obtener(id_lugar)
 
     def eliminar(self, id_lugar: int) -> None:
-        # La FK checkin.id_lugar es ON DELETE RESTRICT: si tiene check-ins, MySQL rechaza el DELETE.
-        res = self._ejecutar("DELETE FROM lugar WHERE id_lugar = :id", {"id": id_lugar}, escribir=True)
+        # Baja logica: conserva check-ins e historial para auditoria.
+        res = self._ejecutar("UPDATE lugar SET activo = FALSE WHERE id_lugar = :id AND activo = TRUE",
+                             {"id": id_lugar}, escribir=True)
         if res.rowcount == 0:
             raise NoEncontrado(f"No existe el lugar {id_lugar}")
 
@@ -148,7 +150,8 @@ class LugaresMySQL(_BaseMySQL, RepoLugares):
             SELECT * FROM (
                 SELECT x.*, ST_Distance_Sphere(POINT(x.longitud, x.latitud), POINT(:lon, :lat)) AS distancia
                 FROM ({_SELECT_LUGAR}
-                      WHERE l.latitud BETWEEN :lat_min AND :lat_max
+                      WHERE l.activo = TRUE
+                        AND l.latitud BETWEEN :lat_min AND :lat_max
                         AND l.longitud BETWEEN :lon_min AND :lon_max) x
             ) d
             WHERE d.distancia <= :radio
@@ -163,7 +166,8 @@ class LugaresMySQL(_BaseMySQL, RepoLugares):
 # ---------------------------------------------------------------- usuarios
 
 _SELECT_USUARIO = """
-    SELECT u.id_usuario, u.nombre_usuario, u.nombre, u.email, u.fecha_alta,
+    SELECT u.id_usuario, u.nombre_usuario, u.nombre, u.email, u.password_hash,
+           u.fecha_alta, u.rol, u.activo,
            b.id_barrio, b.nombre AS barrio, b.id_comuna
     FROM usuario u LEFT JOIN barrio b ON b.id_barrio = u.id_barrio
 """
@@ -173,7 +177,8 @@ def _a_usuario(f: dict) -> Usuario:
     barrio = (Barrio(id=f["id_barrio"], nombre=f["barrio"], comuna=f["id_comuna"])
               if f["id_barrio"] is not None else None)
     return Usuario(id=f["id_usuario"], nombre_usuario=f["nombre_usuario"], nombre=f["nombre"],
-                   email=f["email"], barrio=barrio, fecha_alta=f["fecha_alta"])
+                   email=f["email"], barrio=barrio, fecha_alta=f["fecha_alta"],
+                   rol=f["rol"], activo=bool(f["activo"]))
 
 
 class UsuariosMySQL(_BaseMySQL, RepoUsuarios):
@@ -192,8 +197,8 @@ class UsuariosMySQL(_BaseMySQL, RepoUsuarios):
 
     def crear(self, datos: UsuarioIn) -> Usuario:
         res = self._ejecutar("""
-            INSERT INTO usuario (nombre_usuario, nombre, email, id_barrio, fecha_alta)
-            VALUES (:nombre_usuario, :nombre, :email, :id_barrio, NOW())""",
+            INSERT INTO usuario (nombre_usuario, nombre, email, password_hash, rol, id_barrio, fecha_alta)
+            VALUES (:nombre_usuario, :nombre, :email, 'sin-acceso', 'usuario', :id_barrio, NOW())""",
             datos.model_dump(), escribir=True)
         return self.obtener(res.lastrowid)
 
@@ -201,7 +206,7 @@ class UsuariosMySQL(_BaseMySQL, RepoUsuarios):
 # ---------------------------------------------------------------- check-ins
 
 _SELECT_CHECKIN = """
-    SELECT ch.id_checkin, ch.fecha_hora, ch.puntaje, ch.comentario,
+    SELECT ch.id_checkin, ch.fecha_hora, ch.puntaje, ch.comentario, ch.verificado,
            u.id_usuario, u.nombre_usuario, l.id_lugar, l.nombre AS nombre_lugar
     FROM checkin ch
     JOIN usuario u ON u.id_usuario = ch.id_usuario
@@ -212,6 +217,7 @@ _SELECT_CHECKIN = """
 def _a_checkin(f: dict) -> Checkin:
     return Checkin(
         id=f["id_checkin"], fecha_hora=f["fecha_hora"], puntaje=f["puntaje"], comentario=f["comentario"],
+        verificado=bool(f["verificado"]),
         usuario=Ref(id=f["id_usuario"], nombre=f["nombre_usuario"]),
         lugar=Ref(id=f["id_lugar"], nombre=f["nombre_lugar"]),
     )

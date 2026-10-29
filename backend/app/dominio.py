@@ -1,7 +1,7 @@
 """Modelos de dominio: lo que expone la API, igual para cualquier motor."""
 
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -33,8 +33,9 @@ class Lugar(BaseModel):
     latitud: float | None = None
     longitud: float | None = None
     categoria: Categoria
-    barrio: Barrio
+    barrio: Barrio | None = None
     fuente: str | None = None
+    activo: bool = True
 
 
 class LugarIn(BaseModel):
@@ -43,7 +44,7 @@ class LugarIn(BaseModel):
     latitud: float | None = Field(None, ge=-90, le=90)
     longitud: float | None = Field(None, ge=-180, le=180)
     id_categoria: int
-    id_barrio: int
+    id_barrio: int | None = None
 
 
 class LugarCercano(BaseModel):
@@ -58,6 +59,8 @@ class Usuario(BaseModel):
     email: str
     barrio: Barrio | None = None
     fecha_alta: datetime
+    rol: Literal["usuario", "admin"] = "usuario"
+    activo: bool = True
 
 
 class UsuarioIn(BaseModel):
@@ -67,6 +70,21 @@ class UsuarioIn(BaseModel):
     id_barrio: int | None = None
 
 
+class UsuarioCrear(UsuarioIn):
+    password: str = Field(min_length=8, max_length=128)
+    rol: Literal["usuario", "admin"] = "usuario"
+
+
+class LoginIn(BaseModel):
+    usuario: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class Sesion(BaseModel):
+    token: str
+    usuario: Usuario
+
+
 class Checkin(BaseModel):
     id: int
     usuario: Ref
@@ -74,10 +92,13 @@ class Checkin(BaseModel):
     fecha_hora: datetime
     puntaje: int | None = None
     comentario: str | None = None
+    verificado: bool = False
 
 
 class CheckinIn(BaseModel):
-    id_usuario: int
+    # El backend reemplaza este valor por el usuario autenticado. Se conserva
+    # opcional para que las implementaciones de persistencia compartan interfaz.
+    id_usuario: int | None = None
     id_lugar: int
     fecha_hora: datetime | None = None  # si no viene, ahora
     puntaje: int | None = Field(None, ge=1, le=5)
@@ -119,3 +140,30 @@ class Pasaporte(BaseModel):
     barrios_visitados: list[BarrioVisitado]
     barrios_faltantes: list[Barrio]
     progreso: float  # % de barrios visitados
+
+
+class SugerenciaLugarIn(LugarIn):
+    comentario: str | None = Field(None, max_length=500)
+
+
+class SugerenciaLugar(BaseModel):
+    id: int
+    usuario: Ref
+    nombre: str
+    direccion: str | None = None
+    latitud: float | None = None
+    longitud: float | None = None
+    categoria: Categoria
+    barrio: Barrio | None = None
+    comentario: str | None = None
+    estado: Literal["pendiente", "aprobada", "rechazada"]
+    fecha_alta: datetime
+    revisor: Ref | None = None
+    fecha_revision: datetime | None = None
+    motivo_revision: str | None = None
+    id_lugar_creado: int | None = None
+
+
+class RevisionSugerencia(BaseModel):
+    aprobar: bool
+    motivo: str | None = Field(None, max_length=500)

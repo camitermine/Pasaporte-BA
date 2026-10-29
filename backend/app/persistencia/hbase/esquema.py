@@ -1,4 +1,4 @@
-"""Tablas de HBase que usa el backend (ver documentacion/DISENO.md, sección 6).
+"""Tablas e índices desnormalizados de HBase utilizados por el backend.
 
 Tabla -> column families. El diseño de row keys está documentado en repos.py.
 """

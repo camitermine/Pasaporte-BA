@@ -24,6 +24,13 @@ def filas(con, consulta: str) -> list[dict]:
     return [dict(f._mapping) for f in con.execute(sa.text(consulta))]
 
 
+CONSULTA_CHECKINS = """SELECT ch.*, u.nombre_usuario, l.nombre AS nombre_lugar,
+           l.id_barrio, b.nombre AS barrio
+    FROM checkin ch JOIN usuario u ON u.id_usuario=ch.id_usuario
+    JOIN lugar l ON l.id_lugar=ch.id_lugar
+    JOIN barrio b ON b.id_barrio=l.id_barrio"""
+
+
 def cargar() -> None:
     engine = sa.create_engine(settings.mysql_url)
     with engine.connect() as sql:
@@ -38,11 +45,6 @@ def cargar() -> None:
             LEFT JOIN fuente f ON f.id_fuente=l.id_fuente WHERE l.activo=TRUE""")
         usuarios = filas(sql, """SELECT u.*, b.nombre AS barrio, b.id_comuna
             FROM usuario u LEFT JOIN barrio b ON b.id_barrio=u.id_barrio WHERE u.activo=TRUE""")
-        checkins = filas(sql, """SELECT ch.*, u.nombre_usuario, l.nombre AS nombre_lugar,
-                   l.id_barrio, b.nombre AS barrio
-            FROM checkin ch JOIN usuario u ON u.id_usuario=ch.id_usuario
-            JOIN lugar l ON l.id_lugar=ch.id_lugar
-            JOIN barrio b ON b.id_barrio=l.id_barrio""")
 
     hbase = happybase.Connection(settings.hbase_host, settings.hbase_port)
     crear_tablas(hbase, recrear=True)
@@ -84,11 +86,19 @@ def cargar() -> None:
             }))
             por_nombre.put(u["nombre_usuario"].encode(), a_celdas({"id": u["id_usuario"]}))
 
+    # Los check-ins se leen en streaming: con millones de filas no entran juntos en memoria.
     por_mes, totales = Counter(), Counter()
-    with tabla("checkins").batch(batch_size=1000) as principal, \
+    cantidad_checkins, max_checkin = 0, 0
+    with engine.connect().execution_options(stream_results=True) as sql, \
+            tabla("checkins").batch(batch_size=1000) as principal, \
             tabla("checkins_por_lugar").batch(batch_size=1000) as por_lugar, \
             tabla("checkins_por_usuario").batch(batch_size=1000) as por_usuario:
-        for ch in checkins:
+        for fila in sql.execute(sa.text(CONSULTA_CHECKINS)):
+            ch = fila._mapping
+            cantidad_checkins += 1
+            max_checkin = max(max_checkin, ch["id_checkin"])
+            if cantidad_checkins % 50_000 == 0:
+                print(f"\r  {cantidad_checkins:,} check-ins proyectados", end="", flush=True)
             dato = a_celdas({
                 "id_usuario": ch["id_usuario"], "nombre_usuario": ch["nombre_usuario"],
                 "id_lugar": ch["id_lugar"], "nombre_lugar": ch["nombre_lugar"],
@@ -111,9 +121,9 @@ def cargar() -> None:
     secuencias = tabla("secuencias")
     secuencias.counter_set(b"lugar", b"c:valor", max((x["id_lugar"] for x in lugares), default=0))
     secuencias.counter_set(b"usuario", b"c:valor", max((x["id_usuario"] for x in usuarios), default=0))
-    secuencias.counter_set(b"checkin", b"c:valor", max((x["id_checkin"] for x in checkins), default=0))
+    secuencias.counter_set(b"checkin", b"c:valor", max_checkin)
     hbase.close()
-    print(f"HBase cargado: {len(lugares)} lugares, {len(usuarios)} usuarios, {len(checkins)} check-ins")
+    print(f"HBase cargado: {len(lugares)} lugares, {len(usuarios)} usuarios, {cantidad_checkins} check-ins")
 
 
 if __name__ == "__main__":

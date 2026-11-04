@@ -1,0 +1,73 @@
+fecha,volumen_checkins,consulta,caso,id,checkins_involucrados,motor,mediana_ms,p95_ms,min_ms,repeticiones,equivalentes
+2026-11-04T16:23:05,10000,historial por usuario,mas_activo,10,380,mysql,3.452,3.806,2.993,30,True
+2026-11-04T16:23:05,10000,historial por usuario,mas_activo,10,380,hbase,6.523,7.224,5.864,30,True
+2026-11-04T16:23:05,10000,historial por usuario,mediano,83,30,mysql,2.945,3.137,2.584,30,True
+2026-11-04T16:23:05,10000,historial por usuario,mediano,83,30,hbase,4.559,5.22,4.108,30,True
+2026-11-04T16:23:05,10000,historial por usuario,poco_activo,197,1,mysql,2.216,2.569,1.899,30,True
+2026-11-04T16:23:05,10000,historial por usuario,poco_activo,197,1,hbase,3.48,3.98,3.143,30,True
+2026-11-04T16:23:05,10000,actividad por lugar,mas_activo,1340,606,mysql,3.373,3.758,2.97,30,True
+2026-11-04T16:23:05,10000,actividad por lugar,mas_activo,1340,606,hbase,6.419,7.193,5.965,30,True
+2026-11-04T16:23:06,10000,actividad por lugar,mediano,986,1,mysql,2.287,2.86,1.895,30,True
+2026-11-04T16:23:06,10000,actividad por lugar,mediano,986,1,hbase,3.722,4.146,3.167,30,True
+2026-11-04T16:23:06,10000,actividad por lugar,poco_activo,8331,1,mysql,2.304,2.72,1.948,30,True
+2026-11-04T16:23:06,10000,actividad por lugar,poco_activo,8331,1,hbase,3.728,4.223,3.136,30,True
+2026-11-04T16:23:07,10000,ranking mensual,mas_activo,21,144,mysql,5.105,5.771,4.562,30,True
+2026-11-04T16:23:07,10000,ranking mensual,mas_activo,21,144,hbase,30.047,35.273,28.92,30,True
+2026-11-04T16:23:08,10000,ranking mensual,mediano,5,24,mysql,3.205,3.708,2.799,30,True
+2026-11-04T16:23:08,10000,ranking mensual,mediano,5,24,hbase,11.967,12.678,11.223,30,True
+2026-11-04T16:23:08,10000,ranking mensual,poco_activo,46,3,mysql,2.817,3.759,2.063,30,True
+2026-11-04T16:23:08,10000,ranking mensual,poco_activo,46,3,hbase,7.647,9.804,5.9,30,True
+2026-11-04T16:23:10,10000,pasaporte del usuario,mas_activo,10,380,mysql,37.967,44.438,35.925,30,True
+2026-11-04T16:23:10,10000,pasaporte del usuario,mas_activo,10,380,hbase,14.895,18.387,13.628,30,True
+2026-11-04T16:23:10,10000,pasaporte del usuario,mediano,83,30,mysql,9.408,11.274,8.158,30,True
+2026-11-04T16:23:10,10000,pasaporte del usuario,mediano,83,30,hbase,10.072,11.672,8.673,30,True
+2026-11-04T16:23:11,10000,pasaporte del usuario,poco_activo,197,1,mysql,6.768,7.694,6.077,30,True
+2026-11-04T16:23:11,10000,pasaporte del usuario,poco_activo,197,1,hbase,9.263,10.625,8.115,30,True
+2026-11-04T16:24:42,100000,historial por usuario,mas_activo,310,785,mysql,4.093,5.285,3.178,30,True
+2026-11-04T16:24:42,100000,historial por usuario,mas_activo,310,785,hbase,9.385,12.282,8.035,30,True
+2026-11-04T16:24:43,100000,historial por usuario,mediano,1120,31,mysql,3.366,4.521,2.605,30,True
+2026-11-04T16:24:43,100000,historial por usuario,mediano,1120,31,hbase,5.341,6.871,4.657,30,True
+2026-11-04T16:24:43,100000,historial por usuario,poco_activo,1779,1,mysql,2.375,2.758,1.983,30,True
+2026-11-04T16:24:43,100000,historial por usuario,poco_activo,1779,1,hbase,4.021,4.759,3.369,30,True
+2026-11-04T16:24:43,100000,actividad por lugar,mas_activo,1340,5979,mysql,3.809,4.496,3.088,30,True
+2026-11-04T16:24:43,100000,actividad por lugar,mas_activo,1340,5979,hbase,8.352,9.947,7.344,30,True
+2026-11-04T16:24:43,100000,actividad por lugar,mediano,1626,3,mysql,2.456,3.509,2.074,30,True
+2026-11-04T16:24:43,100000,actividad por lugar,mediano,1626,3,hbase,4.171,4.952,3.597,30,True
+2026-11-04T16:24:44,100000,actividad por lugar,poco_activo,8329,1,mysql,2.431,3.205,1.963,30,True
+2026-11-04T16:24:44,100000,actividad por lugar,poco_activo,8329,1,hbase,4.032,5.238,3.505,30,True
+2026-11-04T16:24:44,100000,ranking mensual,mas_activo,2,1372,mysql,6.147,10.589,5.076,30,True
+2026-11-04T16:24:44,100000,ranking mensual,mas_activo,2,1372,hbase,14.015,20.065,11.805,30,True
+2026-11-04T16:24:45,100000,ranking mensual,mediano,11,244,mysql,3.871,5.428,3.047,30,True
+2026-11-04T16:24:45,100000,ranking mensual,mediano,11,244,hbase,10.225,11.802,8.331,30,True
+2026-11-04T16:24:45,100000,ranking mensual,poco_activo,47,115,mysql,2.893,3.39,2.403,30,True
+2026-11-04T16:24:45,100000,ranking mensual,poco_activo,47,115,hbase,7.396,8.313,6.211,30,True
+2026-11-04T16:24:49,100000,pasaporte del usuario,mas_activo,310,785,mysql,88.831,105.732,74.776,30,True
+2026-11-04T16:24:49,100000,pasaporte del usuario,mas_activo,310,785,hbase,20.295,24.448,17.921,30,True
+2026-11-04T16:24:49,100000,pasaporte del usuario,mediano,1120,31,mysql,9.863,11.064,8.3,30,True
+2026-11-04T16:24:49,100000,pasaporte del usuario,mediano,1120,31,hbase,10.465,11.974,9.391,30,True
+2026-11-04T16:24:50,100000,pasaporte del usuario,poco_activo,1779,1,mysql,6.989,8.112,5.88,30,True
+2026-11-04T16:24:50,100000,pasaporte del usuario,poco_activo,1779,1,hbase,9.692,10.635,9.01,30,True
+2026-11-04T16:37:46,1000001,historial por usuario,mas_activo,1063,1303,mysql,3.562,4.169,3.068,30,True
+2026-11-04T16:37:46,1000001,historial por usuario,mas_activo,1063,1303,hbase,8.264,8.953,7.61,30,True
+2026-11-04T16:37:47,1000001,historial por usuario,mediano,18068,31,mysql,3.042,3.255,2.505,30,True
+2026-11-04T16:37:47,1000001,historial por usuario,mediano,18068,31,hbase,5.002,5.794,4.316,30,True
+2026-11-04T16:37:47,1000001,historial por usuario,poco_activo,19779,1,mysql,2.231,2.616,1.88,30,True
+2026-11-04T16:37:47,1000001,historial por usuario,poco_activo,19779,1,hbase,3.88,4.256,3.264,30,True
+2026-11-04T16:37:47,1000001,actividad por lugar,mas_activo,1340,59899,mysql,3.774,4.564,3.217,30,True
+2026-11-04T16:37:47,1000001,actividad por lugar,mas_activo,1340,59899,hbase,8.296,10.003,7.417,30,True
+2026-11-04T16:37:47,1000001,actividad por lugar,mediano,6245,25,mysql,2.983,3.234,2.54,30,True
+2026-11-04T16:37:47,1000001,actividad por lugar,mediano,6245,25,hbase,4.716,5.278,4.098,30,True
+2026-11-04T16:37:48,1000001,actividad por lugar,poco_activo,7269,1,mysql,2.328,2.648,1.819,30,True
+2026-11-04T16:37:48,1000001,actividad por lugar,poco_activo,7269,1,hbase,3.907,4.592,3.324,30,True
+2026-11-04T16:37:49,1000001,ranking mensual,mas_activo,2,13463,mysql,24.019,27.076,23.195,30,True
+2026-11-04T16:37:49,1000001,ranking mensual,mas_activo,2,13463,hbase,13.983,17.015,12.42,30,True
+2026-11-04T16:37:49,1000001,ranking mensual,mediano,19,2307,mysql,6.862,8.413,6.289,30,True
+2026-11-04T16:37:49,1000001,ranking mensual,mediano,19,2307,hbase,9.063,9.965,7.58,30,True
+2026-11-04T16:37:50,1000001,ranking mensual,poco_activo,34,1660,mysql,5.664,6.51,5.149,30,True
+2026-11-04T16:37:50,1000001,ranking mensual,poco_activo,34,1660,hbase,7.873,8.814,6.811,30,True
+2026-11-04T16:37:57,1000001,pasaporte del usuario,mas_activo,1063,1303,mysql,172.23,203.896,145.181,30,True
+2026-11-04T16:37:57,1000001,pasaporte del usuario,mas_activo,1063,1303,hbase,27.093,43.712,24.282,30,True
+2026-11-04T16:37:57,1000001,pasaporte del usuario,mediano,18068,31,mysql,9.873,11.419,8.777,30,True
+2026-11-04T16:37:57,1000001,pasaporte del usuario,mediano,18068,31,hbase,10.037,12.176,8.518,30,True
+2026-11-04T16:37:58,1000001,pasaporte del usuario,poco_activo,19779,1,mysql,6.599,7.247,5.963,30,True
+2026-11-04T16:37:58,1000001,pasaporte del usuario,poco_activo,19779,1,hbase,9.522,10.215,8.239,30,True

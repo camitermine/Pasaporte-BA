@@ -119,13 +119,21 @@ Set-Location ..
 python -m compileall -q backend\app backend\dev database\etl database\hbase
 ```
 
-La comparación es una herramienta interna del TP; no aparece como selector en la app. Con ambas
-bases cargadas se ejecutan las mismas lecturas y se verifican resultados y medianas de tiempo:
+## Comparación de rendimiento MySQL vs HBase
+
+La comparación es una herramienta interna del TP; no aparece como selector en la app. Primero se
+genera actividad simulada sobre los lugares reales (usuarios `sim_*` y check-ins entre mayo y
+octubre de 2026, siempre los mismos para la misma semilla), después se proyecta a HBase y por
+último se miden las mismas lecturas en ambos motores, verificando que devuelvan lo mismo:
 
 ```powershell
 Set-Location backend
-.venv\Scripts\python -m dev.comparar_motores --usuario 1 --lugar 1 --barrio 1 --mes 2026-10 --repeticiones 10
+.venv\Scripts\python -m dev.generar_actividad --checkins 100000
+.venv\Scripts\python ..\database\hbase\cargar_desde_mysql.py
+.venv\Scripts\python -m dev.comparar_motores --repeticiones 30 --csv dev\resultados\benchmark.csv
 ```
 
-Antes de sacar conclusiones de rendimiento hay que generar un volumen representativo de
-check-ins y repetir las mediciones en condiciones controladas.
+`comparar_motores` elige solo casos representativos (el usuario, lugar y barrio con más actividad,
+uno mediano y uno con poca); con `--usuario`, `--lugar` o `--barrio` se fuerza uno. Los datos
+simulados aparecen en los rankings de la app; para la demo se eliminan con
+`.venv\Scripts\python -m dev.generar_actividad --borrar` y se vuelve a correr `cargar_desde_mysql.py`.

@@ -293,7 +293,7 @@ class ConsultasMySQL(_BaseMySQL, RepoConsultas):
             SELECT id_lugar, nombre, categoria, checkins,
                    RANK() OVER (ORDER BY checkins DESC) AS puesto
             FROM conteo
-            ORDER BY puesto, nombre
+            ORDER BY puesto, nombre, id_lugar
             LIMIT :top""", {"barrio": id_barrio, "inicio": inicio, "fin": fin, "top": top})
         return [ItemRanking(puesto=f["puesto"], lugar=Ref(id=f["id_lugar"], nombre=f["nombre"]),
                             categoria=f["categoria"], checkins=f["checkins"]) for f in filas]

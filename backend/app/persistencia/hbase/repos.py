@@ -447,12 +447,16 @@ class CheckinsHBase(_BaseHBase, RepoCheckins):
 class ConsultasHBase(_BaseHBase, RepoConsultas):
     def ranking_barrio(self, id_barrio: int, anio: int, mes: int, top: int) -> list[ItemRanking]:
         # 1) lugares del barrio (tabla índice)  2) contador del mes de cada uno  3) orden en la app
-        lugares = self._scan("lugares_por_barrio", prefijo_=prefijo(id_barrio))
-        ids = [int(k.split(b"#")[1]) for k, _ in lugares]
+        lugares = self._scan("lugares_por_barrio", prefijo_=prefijo(id_barrio), columnas=[b"d:nombre"])
+        nombres = {int(k.split(b"#")[1]): v.get(b"d:nombre", b"").decode() for k, v in lugares}
+        ids = list(nombres)
         columna = f"m:{anio}{mes:02d}".encode()
         contadores = dict(self._multiget("stats_lugar", [clave(i) for i in ids], [columna]))
         conteos = [(leer_contador(contadores.get(clave(i), {}).get(columna)), i) for i in ids]
-        conteos = sorted((c for c in conteos if c[0] > 0), key=lambda x: -x[0])
+        # Los empates se desempatan por nombre ANTES de cortar en `top`, igual que el
+        # ORDER BY puesto, nombre ... LIMIT de MySQL; si no, el corte depende del orden de los ids.
+        conteos = sorted((c for c in conteos if c[0] > 0),
+                         key=lambda x: (-x[0], orden_texto(nombres[x[1]]), x[1]))
 
         completos = dict(self._multiget("lugares", [clave(i) for _, i in conteos[:top]],
                                         [b"d:nombre", b"d:categoria"]))
@@ -463,7 +467,7 @@ class ConsultasHBase(_BaseHBase, RepoConsultas):
             ranking.append(ItemRanking(puesto=puesto, lugar=Ref(id=i, nombre=d.get("nombre", "?")),
                                        categoria=d.get("categoria", "?"), checkins=cant))
             puesto_anterior, cant_anterior = puesto, cant
-        return sorted(ranking, key=lambda r: (r.puesto, orden_texto(r.lugar.nombre)))
+        return sorted(ranking, key=lambda r: (r.puesto, orden_texto(r.lugar.nombre), r.lugar.id))
 
     def pasaporte(self, id_usuario: int) -> Pasaporte:
         usuario = UsuariosHBase(self.traza).obtener(id_usuario)

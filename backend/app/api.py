@@ -1,7 +1,12 @@
 """API HTTP de Pasaporte BA.
 
-El cliente no elige una base. El backend asigna cada responsabilidad al motor
-correspondiente y devuelve esa informacion en ``meta`` para hacerla visible.
+Por defecto el backend asigna cada responsabilidad al motor correspondiente
+(modo automatico) y devuelve esa informacion en ``meta`` para hacerla visible.
+
+Modo demostracion del polimorfismo: con el header ``X-Motor: mysql|hbase`` las
+lecturas (GET) se resuelven con la implementacion de ese motor a traves de la
+misma interfaz de repositorios. Las escrituras siempre van a MySQL (fuente de
+verdad) y se replican a HBase, para que ambas bases sigan sincronizadas.
 """
 
 import re
@@ -10,7 +15,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
 
-from app.config import settings
+from app.config import MOTORES, settings
 from app.dominio import (
     CheckinCambios, CheckinIn, FiltroLugares, LoginIn, LugarIn, RevisionSugerencia,
     SugerenciaLugarIn, Usuario, UsuarioCrear,
@@ -23,9 +28,26 @@ from app.persistencia.hbase.proyeccion import ProyectorHBase
 router = APIRouter()
 
 
-def persistencia(request: Request) -> Persistencia:
-    # Los datos maestros y las escrituras transaccionales son responsabilidad de MySQL.
-    p = crear_persistencia("mysql")
+def motor_forzado(request: Request,
+                  x_motor: Annotated[str | None, Header(
+                      description="Opcional (modo demo): mysql o hbase. Solo aplica a lecturas.")] = None,
+                  ) -> str | None:
+    """Motor pedido por el cliente para una lectura, o None para el modo automatico."""
+    if not x_motor or x_motor.lower() == "auto":
+        return None
+    motor = x_motor.lower()
+    if motor not in MOTORES:
+        raise HTTPException(422, f"X-Motor debe ser auto, {' o '.join(MOTORES)}")
+    # Las escrituras ignoran el selector: MySQL es la fuente de verdad y HBase su proyeccion.
+    return motor if request.method == "GET" else None
+
+
+Forzado = Annotated[str | None, Depends(motor_forzado)]
+
+
+def persistencia(request: Request, forzado: Forzado) -> Persistencia:
+    # Modo automatico: datos maestros y escrituras transaccionales son responsabilidad de MySQL.
+    p = crear_persistencia(forzado or "mysql")
     request.state.persistencia = p
     return p
 
@@ -34,8 +56,9 @@ P = Annotated[Persistencia, Depends(persistencia)]
 Limite = Annotated[int, Query(ge=1, le=100)]
 
 
-def persistencia_actividad(request: Request) -> Persistencia:
-    p = crear_persistencia_actividad()
+def persistencia_actividad(request: Request, forzado: Forzado) -> Persistencia:
+    # Modo automatico: escritura canonica en MySQL + lecturas de actividad desde HBase.
+    p = crear_persistencia(forzado) if forzado else crear_persistencia_actividad()
     request.state.persistencia = p
     return p
 
@@ -107,7 +130,8 @@ def logout(p: P, token: Token):
 @router.get("/motores", tags=["general"])
 def motores():
     return {"data": {
-        "seleccion_usuario": False,
+        "seleccion_usuario": "lecturas (header X-Motor)",
+        "motores": list(MOTORES),
         "datos_maestros": "mysql",
         "actividad": settings.actividad_db,
     }}

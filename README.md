@@ -15,8 +15,13 @@ FastAPI
    └── HBase: historiales de check-in, pasaporte, índices y rankings
 ```
 
-El usuario no selecciona una base. El backend decide qué motor corresponde y cada respuesta
+En modo automático, el backend decide qué motor corresponde a cada operación. Cada respuesta
 incluye `meta.motor` para poder identificarlo y explicarlo durante la presentación.
+
+Para mostrar el backend polimórfico, en la app (*Perfil → Motor de base de datos*) se puede
+forzar MySQL o HBase. La app envía el header `X-Motor` y las **lecturas** se resuelven con la
+implementación de ese motor detrás de la misma interfaz. Las escrituras siempre van a MySQL y se
+replican a HBase, para que ambas bases sigan sincronizadas.
 
 ## Datos
 
@@ -26,10 +31,12 @@ El repositorio incluye los cuatro CSV recibidos en `database/datasets/tablas_3fn
 python database\etl\generar_datos_mysql.py
 ```
 
-genera `database/mysql/datos_iniciales.sql` con 8.322 lugares válidos, 48 barrios y 232 categorías
+genera `database/mysql/datos_iniciales.sql` con 8.322 lugares válidos, 48 barrios y 228 categorías
 de origen. Los CSV originales se conservan sin modificaciones. Durante la limpieza, el ETL:
 
 - Consolida las dos codificaciones de Núñez en un único barrio.
+- Consolida categorías que solo difieren en acentos (por ejemplo `OLEO S/TELA` y `ÖLEO S/TELA`),
+  porque MySQL las considera iguales en la restricción `UNIQUE`.
 - Omite 10 registros sin nombre y no inventa valores.
 - Conserva 270 lugares sin barrio con `id_barrio = NULL`.
 - Convierte coordenadas incompletas a `NULL`.
@@ -37,8 +44,14 @@ de origen. Los CSV originales se conservan sin modificaciones. Durante la limpie
 - Usa los tipos de origen como categorías agrupadas en cultura, patrimonio, arte urbano o
   gastronomía.
 
-El material recibido no contiene URL, fecha de descarga ni licencia de las cuatro fuentes; esos
-datos deben completarse antes de la entrega del informe.
+Los datos provienen del portal de datos abiertos de la Ciudad
+(<https://data.buenosaires.gob.ar>, categoría *Cultura y turismo*): espacios culturales,
+monumentos, murales y oferta gastronómica. Falta registrar la URL exacta, la fecha de descarga y
+la licencia de cada dataset (ver `documentacion/informe.md`, sección 2).
+
+## Documentación
+
+El informe, el DER y la guía de pendientes están en `documentacion/`.
 
 ## Puesta en marcha local
 
@@ -81,7 +94,18 @@ npm ci
 npx expo start
 ```
 
-Expo muestra un código QR. Hay que escanearlo con Expo Go desde un teléfono conectado a la misma
+Para presentar desde la computadora (por ejemplo, compartiendo pantalla en Meet) se puede usar la
+versión web, que se muestra centrada con ancho de celular:
+
+```powershell
+npx expo start --web
+```
+
+En web el mapa de `Cerca` se reemplaza por un mapa embebido de OpenStreetMap. Como el repositorio
+está en OneDrive, a veces Metro no detecta cambios en los archivos: si la app no se actualiza,
+reiniciar con `npx expo start --web --clear`.
+
+Para usarla en el teléfono, Expo muestra un código QR. Hay que escanearlo con Expo Go desde un teléfono conectado a la misma
 red. La app calcula la URL del backend con la IP usada por Expo; también se puede modificar desde
 `Ajustes`. Si Windows pregunta por el firewall, se debe permitir el acceso de Node y Python en
 redes privadas.
@@ -106,7 +130,7 @@ administrador y las contraseñas se guardan con PBKDF2-SHA256 y salt aleatorio.
 - Pasaporte de barrios y ranking mensual.
 - Sugerencias de lugares y moderación administrativa.
 - Alta, modificación y baja lógica de lugares solo para administradores.
-- Indicador del motor que resolvió cada operación, sin selector para el usuario.
+- Indicador del motor que resolvió cada operación y selector de motor para las lecturas (modo demo).
 
 ## Verificación
 
@@ -121,7 +145,7 @@ python -m compileall -q backend\app backend\dev database\etl database\hbase
 
 ## Comparación de rendimiento MySQL vs HBase
 
-La comparación es una herramienta interna del TP; no aparece como selector en la app. Primero se
+La comparación de rendimiento es una herramienta interna del TP. Primero se
 genera actividad simulada sobre los lugares reales (usuarios `sim_*` y check-ins entre mayo y
 octubre de 2026, siempre los mismos para la misma semilla), después se proyecta a HBase y por
 último se miden las mismas lecturas en ambos motores, verificando que devuelvan lo mismo:

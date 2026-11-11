@@ -5,7 +5,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useConfig } from '@/lib/config';
-import { colorMotor, colores, mono } from './ui';
+import { colorMotor, colores, fuentes, mono } from './ui';
 
 export function DebugBar() {
   const { debug, historial } = useConfig();
@@ -26,7 +26,7 @@ export function DebugBar() {
         }}
         style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
         <View style={{ backgroundColor: colorMotor(meta.motor), borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
-          <Text style={{ color: colores.blanco, fontSize: 11, fontWeight: '800' }}>{meta.motor.toUpperCase()}</Text>
+          <Text style={{ color: colores.blanco, fontSize: 11, fontFamily: fuentes.extra }}>{meta.motor.toUpperCase()}</Text>
         </View>
         <Text style={{ color: '#CBD5E1', fontFamily: mono, fontSize: 11, flex: 1 }} numberOfLines={1}>
           {registro.pedido}

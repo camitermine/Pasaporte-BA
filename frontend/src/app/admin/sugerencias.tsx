@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { FlatList, Text, View } from 'react-native';
 
-import { avisar, Boton, confirmar, Estado, s, Tarjeta } from '@/components/ui';
+import { avisar, Boton, confirmar, Estado, nombrePropio, s, Tarjeta } from '@/components/ui';
 import { mensajeError, useApi, useCarga } from '@/lib/api';
 import { useConfig } from '@/lib/config';
 import type { SugerenciaLugar } from '@/lib/tipos';
@@ -27,8 +27,8 @@ export default function ModerarSugerencias() {
   return <View style={s.pantalla}>
     <FlatList data={lista.datos ?? []} keyExtractor={(x) => String(x.id)} contentContainerStyle={s.contenido}
       renderItem={({ item }) => <Tarjeta>
-        <Text style={s.titulo}>{item.nombre}</Text>
-        <Text style={s.suave}>{item.categoria.nombre} · {item.barrio?.nombre ?? 'Sin barrio'}</Text>
+        <Text style={[s.titulo, { fontSize: 21 }]}>{nombrePropio(item.nombre)}</Text>
+        <Text style={s.suave}>{nombrePropio(item.categoria.nombre)} · {item.barrio ? nombrePropio(item.barrio.nombre) : 'Sin barrio'}</Text>
         <Text style={s.suave}>{item.direccion ?? 'Sin dirección'} · @{item.usuario.nombre}</Text>
         {item.comentario ? <Text style={{ marginVertical: 8 }}>{item.comentario}</Text> : null}
         <View style={s.filaBotones}>

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import { Selector } from '@/components/Selector';
-import { avisar, Boton, Campo, Estado, s } from '@/components/ui';
+import { avisar, Boton, Campo, Estado, nombrePropio, s } from '@/components/ui';
 import { mensajeError, useApi, useCarga, volver } from '@/lib/api';
 import type { Barrio, Categoria } from '@/lib/tipos';
 
@@ -58,9 +58,9 @@ export default function FormSugerencia() {
       <View style={{ flex: 1 }}><Campo etiqueta="Longitud" value={lon} onChangeText={setLon} keyboardType="numbers-and-punctuation" /></View>
     </View>
     <Boton titulo="Usar mi ubicación" variante="secundario" onPress={usarUbicacion} estilo={{ marginBottom: 12 }} />
-    <Selector etiqueta="Categoría *" opciones={datos.datos.categorias.map((c) => ({ id: c.id, etiqueta: c.nombre, detalle: c.tipo }))}
+    <Selector etiqueta="Categoría *" opciones={datos.datos.categorias.map((c) => ({ id: c.id, etiqueta: nombrePropio(c.nombre), detalle: c.tipo }))}
       valor={idCategoria} onCambiar={setIdCategoria} permitirVacio={false} />
-    <Selector etiqueta="Barrio" opciones={datos.datos.barrios.map((b) => ({ id: b.id, etiqueta: b.nombre, detalle: `Comuna ${b.comuna}` }))}
+    <Selector etiqueta="Barrio" opciones={datos.datos.barrios.map((b) => ({ id: b.id, etiqueta: nombrePropio(b.nombre), detalle: `Comuna ${b.comuna}` }))}
       valor={idBarrio} onCambiar={setIdBarrio} />
     <Campo etiqueta="Comentario para el administrador" value={comentario}
       onChangeText={(t) => setComentario(t.slice(0, 500))} multiline />

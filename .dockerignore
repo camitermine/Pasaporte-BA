@@ -1,0 +1,11 @@
+.git
+.claude
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.env
+frontend/.expo
+frontend/dist
+database/datasets
+documentacion

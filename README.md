@@ -53,9 +53,49 @@ la licencia de cada dataset (ver `documentacion/informe.md`, sección 2).
 
 El informe, el DER y la guía de pendientes están en `documentacion/`.
 
-## Puesta en marcha local
+## Puesta en marcha con Docker (recomendada para probar)
 
-Cada integrante trabaja con sus propias bases locales. Requisitos en la computadora:
+Solo se necesita **Git** y **Docker Desktop abierto**. Desde la raíz del repositorio:
+
+```powershell
+docker compose up -d --build
+```
+
+La primera vez tarda unos minutos porque arma las imágenes. Cuando termina, abrir
+**<http://localhost:8081>** en el navegador.
+
+| Servicio | Qué hace | Puerto en la PC |
+|---|---|---|
+| `web` | Versión web de la app (Expo exportado, servido con nginx) | 8081 |
+| `backend` | API FastAPI. Documentación en `/docs` | 8000 |
+| `mysql` | Datos maestros y transacciones | 3307 |
+| `hbase` | Historiales, pasaporte y rankings (UI del Master en 16010) | 9090 |
+| `hbase-init` | Reconstruye HBase desde MySQL en cada arranque y termina | — |
+
+La primera vez que se crea el volumen de MySQL se cargan solos `modelo_relacional.sql` y
+`datos_iniciales.sql`. En cada `up`, `hbase-init` vuelve a proyectar HBase desde MySQL, y el
+backend arranca cuando esa carga termina.
+
+Comandos útiles:
+
+```powershell
+docker compose ps                # estado de los servicios (hbase-init figura "Exited (0)": es normal)
+docker compose logs -f backend   # ver los logs de un servicio
+docker compose stop              # apagar todo sin perder datos
+docker compose up -d --build     # después de un git pull con cambios en el código
+docker compose down -v           # BORRA las bases y las recrea en el próximo up
+```
+
+`down -v` hace falta cuando cambia `datos_iniciales.sql`: los scripts de carga solo corren con el
+volumen vacío. Borra también los check-ins, favoritos y sugerencias que se hayan cargado a mano.
+
+Si un puerto está ocupado (por ejemplo, el 8081 por un `npx expo start` abierto), cerrar ese
+proceso o cambiar el puerto de la izquierda en `docker-compose.yml`.
+
+## Puesta en marcha para desarrollo
+
+Para editar el código con recarga automática o probar la app en el teléfono, el backend y la
+app se corren fuera de Docker. Requisitos en la computadora:
 
 - Git.
 - Docker Desktop abierto.
@@ -68,13 +108,17 @@ del repositorio en PowerShell.
 
 ### 1. Bases de datos
 
+Se levantan solo las bases; si el stack completo está corriendo, primero
+`docker compose stop backend web` para liberar los puertos 8000 y 8081.
+
 ```powershell
-docker compose up -d
+docker compose up -d mysql hbase
 cmd /c "docker exec -i pasaporteba-mysql mysql --default-character-set=utf8mb4 -upasaporte -ppasaporte pasaporteba < database\mysql\modelo_relacional.sql"
 cmd /c "docker exec -i pasaporteba-mysql mysql --default-character-set=utf8mb4 -upasaporte -ppasaporte pasaporteba < database\mysql\datos_iniciales.sql"
 ```
 
-Si MySQL todavía está arrancando, el primer comando falla con un error de conexión: esperar
+Si las bases se crean por primera vez, MySQL ya carga el esquema y los datos solo y estos dos
+comandos se pueden saltear. Si MySQL todavía está arrancando, el primer comando falla con un error de conexión: esperar
 unos segundos y repetirlo. Se usa `cmd /c` con `<` porque el pipe de PowerShell 5.1
 (`Get-Content | docker exec`) cambia la codificación y rompe las tildes y las ñ. Estos comandos
 **borran y recrean** la base local; hay que volver a correrlos cada vez que cambia

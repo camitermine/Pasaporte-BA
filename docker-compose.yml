@@ -12,10 +12,16 @@ services:
       - "3307:3306"   # 3307 en la PC porque el 3306 ya lo usa un MySQL local
     volumes:
       - mysql_data:/var/lib/mysql
+      # Solo se ejecutan la primera vez, cuando el volumen está vacío
+      - ./database/mysql/modelo_relacional.sql:/docker-entrypoint-initdb.d/01_modelo.sql:ro
+      - ./database/mysql/datos_iniciales.sql:/docker-entrypoint-initdb.d/02_datos.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      # Por TCP: el servidor temporal que carga los scripts de init no escucha en red,
+      # así que esto recién da OK cuando los datos ya están cargados.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-upasaporte", "-ppasaporte"]
       interval: 5s
-      retries: 20
+      retries: 30
+      start_period: 30s
 
   hbase:
     # HBase standalone (incluye ZooKeeper embebido, Thrift en 9090 y REST en 8080)
@@ -28,6 +34,46 @@ services:
       - "8080:8080"   # REST (opcional)
     volumes:
       - hbase_data:/hbase-data
+
+  # Reconstruye HBase desde MySQL en cada arranque y termina
+  hbase-init:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    image: pasaporteba-backend
+    container_name: pasaporteba-hbase-init
+    environment: &backend_env
+      MYSQL_URL: mysql+pymysql://pasaporte:pasaporte@mysql:3306/pasaporteba?charset=utf8mb4
+      HBASE_HOST: hbase
+      HBASE_PORT: "9090"
+      ACTIVIDAD_DB: hbase
+      MOTOR_DB: mysql
+    command: ["sh", "/app/docker/cargar_hbase.sh"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      hbase:
+        condition: service_started
+
+  backend:
+    image: pasaporteba-backend
+    container_name: pasaporteba-backend
+    environment: *backend_env
+    ports:
+      - "8000:8000"
+    depends_on:
+      hbase-init:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    container_name: pasaporteba-web
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
 
 volumes:
   mysql_data:

@@ -11,7 +11,8 @@ app = FastAPI(
     title="Pasaporte BA",
     description=(
         "API híbrida: MySQL conserva identidad, catálogo y transacciones; "
-        "HBase optimiza historiales, pasaporte y rankings. El cliente no elige el motor."
+        "HBase optimiza historiales, pasaporte y rankings. Para demostrar el polimorfismo, "
+        "el header X-Motor (mysql|hbase) fuerza el motor de las lecturas."
     ),
 )
 

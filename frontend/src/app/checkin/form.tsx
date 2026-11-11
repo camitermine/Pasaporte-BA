@@ -4,7 +4,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
-import { avisar, Boton, Campo, confirmar, Estado, Estrellas, formatearFecha, s, Tarjeta } from '@/components/ui';
+import { avisar, Boton, Campo, confirmar, Estado, Estrellas, formatearFecha, IconoTipo, nombrePropio, s, Tarjeta } from '@/components/ui';
 import { mensajeError, useApi, useCarga, volver } from '@/lib/api';
 import type { Checkin, Lugar } from '@/lib/tipos';
 
@@ -67,13 +67,18 @@ export default function FormCheckin() {
   return (
     <ScrollView style={s.pantalla} contentContainerStyle={s.contenido} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: editando ? 'Editar check-in' : 'Nuevo check-in' }} />
-      <Tarjeta>
-        <Text style={s.titulo}>{lugar.nombre}</Text>
-        <Text style={s.suave}>{lugar.categoria.nombre} · {lugar.barrio?.nombre ?? 'Barrio sin definir'}</Text>
-        {checkin && <Text style={[s.suave, { marginTop: 4 }]}>Check-in del {formatearFecha(checkin.fecha_hora)}</Text>}
+      <Tarjeta estilo={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+        <IconoTipo tipo={lugar.categoria.tipo} tamanio={58} />
+        <View style={{ flex: 1 }}>
+          <Text style={[s.titulo, { fontSize: 22 }]}>{nombrePropio(lugar.nombre)}</Text>
+          <Text style={s.suave}>
+            {nombrePropio(lugar.categoria.nombre)} · {lugar.barrio ? nombrePropio(lugar.barrio.nombre) : 'Barrio sin definir'}
+          </Text>
+          {checkin && <Text style={[s.suave, { marginTop: 4 }]}>Check-in del {formatearFecha(checkin.fecha_hora)}</Text>}
+        </View>
       </Tarjeta>
 
-      <Text style={s.etiqueta}>Puntaje (opcional, tocá de nuevo para quitarlo)</Text>
+      <Text style={s.etiqueta}>¿Cómo estuvo? (opcional, tocá de nuevo para quitarlo)</Text>
       <View style={{ marginBottom: 16 }}>
         <Estrellas valor={puntaje} onCambiar={setPuntaje} tamanio={36} />
       </View>
@@ -84,8 +89,8 @@ export default function FormCheckin() {
         multiline
         placeholder="¿Qué te pareció?"
       />
-      <Boton titulo={editando ? 'Guardar cambios' : '✓ Hacer check-in'} onPress={guardar} cargando={guardando} />
-      {editando && <Boton titulo="Borrar check-in" variante="peligro" onPress={borrar} estilo={{ marginTop: 8 }} />}
+      <Boton titulo={editando ? 'Guardar cambios' : 'Hacer check-in'} icono="checkmark-circle" onPress={guardar} cargando={guardando} />
+      {editando && <Boton titulo="Borrar check-in" icono="trash-outline" variante="peligro" onPress={borrar} estilo={{ marginTop: 8 }} />}
     </ScrollView>
   );
 }

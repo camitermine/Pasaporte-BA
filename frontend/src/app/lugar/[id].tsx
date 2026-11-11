@@ -1,11 +1,16 @@
-// Detalle de un lugar: datos, acciones (check-in, editar, borrar) y últimos check-ins.
+// Detalle de un lugar: datos, acciones (check-in, favorito, editar, borrar) y últimos check-ins.
 
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Text, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ItemCheckin } from '@/components/Items';
-import { avisar, Boton, colores, confirmar, Estado, Fila, s, Tarjeta } from '@/components/ui';
+import {
+  avisar, Boton, colores, confirmar, Estado, Etiqueta, Fila, fuentes, nombrePropio, s, Seccion, Tarjeta, tipoDe,
+} from '@/components/ui';
 import { mensajeError, qs, useApi, useCarga, usePaginado, volver } from '@/lib/api';
 import { useConfig } from '@/lib/config';
 import type { Checkin, Lugar } from '@/lib/tipos';
@@ -14,6 +19,7 @@ export default function DetalleLugar() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const api = useApi();
   const { usuario } = useConfig();
+  const insets = useSafeAreaInsets();
   const [borrando, setBorrando] = useState(false);
 
   const lugar = useCarga(() => api.get<Lugar>(`/lugares/${id}`), [id]);
@@ -46,65 +52,100 @@ export default function DetalleLugar() {
 
   if (!l) {
     return (
-      <View style={s.pantalla}>
+      <View style={[s.pantalla, { paddingTop: insets.top + 56 }]}>
         <Estado cargando={lugar.cargando} error={lugar.error} onReintentar={lugar.recargar} />
       </View>
     );
   }
 
+  const t = tipoDe(l.categoria.tipo);
+  const esFavorito = !!favorito.datos?.favorito;
+
   return (
     <View style={s.pantalla}>
-      <Stack.Screen options={{ title: l.nombre }} />
       <FlatList
         data={checkins.items}
         keyExtractor={(c) => String(c.id)}
-        contentContainerStyle={s.contenido}
+        contentContainerStyle={{ paddingBottom: 40 }}
         ListHeaderComponent={
           <View>
-            <Tarjeta>
-              <Text style={s.titulo}>{l.nombre}</Text>
-              <Text style={[s.suave, { marginBottom: 8 }]}>{l.categoria.nombre} · {l.categoria.tipo}</Text>
-              <Fila etiqueta="Barrio" valor={l.barrio ? `${l.barrio.nombre} (Comuna ${l.barrio.comuna})` : 'Sin definir'} />
-              <Fila etiqueta="Dirección" valor={l.direccion ?? '—'} />
-              <Fila etiqueta="Ubicación" valor={l.latitud !== null ? `${l.latitud}, ${l.longitud}` : '—'} />
-              <Fila etiqueta="Fuente" valor={l.fuente ?? 'Cargado desde la app'} />
-              <Fila etiqueta="ID" valor={String(l.id)} />
-            </Tarjeta>
+            <LinearGradient
+              colors={[t.fondo, colores.fondo]}
+              style={{ paddingTop: insets.top + 64, paddingHorizontal: 18, paddingBottom: 8 }}>
+              <View style={{ position: 'absolute', right: -40, top: insets.top + 10, opacity: 0.12 }}>
+                <Ionicons name={t.icono} size={220} color={t.color} />
+              </View>
+              <Etiqueta texto={t.etiqueta.toUpperCase()} color={t.color} />
+              <Text style={{ fontFamily: fuentes.titulo, fontSize: 34, lineHeight: 38, color: colores.texto, marginTop: 10 }}>
+                {nombrePropio(l.nombre)}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
+                <Ionicons name="location" size={14} color={colores.acento} />
+                <Text style={[s.suave, { fontSize: 14 }]}>
+                  {l.barrio ? `${nombrePropio(l.barrio.nombre)} · Comuna ${l.barrio.comuna}` : 'Barrio sin definir'}
+                </Text>
+              </View>
+            </LinearGradient>
 
-            <View style={s.filaBotones}>
-              <Boton titulo="Hacer check-in" estilo={{ flex: 1 }} onPress={() => router.push(`/checkin/form?idLugar=${l.id}`)} />
-              <Boton titulo={favorito.datos?.favorito ? 'Quitar favorito' : 'Guardar favorito'}
-                variante="secundario" estilo={{ flex: 1 }} onPress={alternarFavorito} />
+            <View style={{ paddingHorizontal: 18 }}>
+              <View style={[s.filaBotones, { marginTop: 14, marginBottom: 14 }]}>
+                <Boton titulo="Hacer check-in" icono="checkmark-circle" estilo={{ flex: 1 }}
+                  deshabilitado={!l.barrio}
+                  onPress={() => router.push(`/checkin/form?idLugar=${l.id}`)} />
+                <Pressable onPress={alternarFavorito} style={({ pressed }) => ({
+                  width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: esFavorito ? colores.acentoClaro : colores.blanco,
+                  borderWidth: 1.5, borderColor: esFavorito ? colores.acentoClaro : colores.borde, opacity: pressed ? 0.7 : 1,
+                })}>
+                  <Ionicons name={esFavorito ? 'heart' : 'heart-outline'} size={22} color={colores.acento} />
+                </Pressable>
+              </View>
+              {!l.barrio && (
+                <Text style={[s.suave, { marginBottom: 12 }]}>Este lugar todavía no tiene barrio validado, por eso no admite check-in.</Text>
+              )}
+
+              <Tarjeta>
+                <Fila icono="pricetag-outline" etiqueta="Categoría" valor={nombrePropio(l.categoria.nombre)} />
+                <Fila icono="navigate-outline" etiqueta="Dirección" valor={l.direccion ?? '—'} />
+                <Fila icono="locate-outline" etiqueta="Ubicación"
+                  valor={l.latitud !== null ? `${l.latitud.toFixed(5)}, ${l.longitud?.toFixed(5)}` : '—'} />
+                <Fila icono="document-text-outline" etiqueta="Fuente" valor={l.fuente ?? 'Cargado desde la app'} />
+                <Fila icono="key-outline" etiqueta="ID" valor={String(l.id)} />
+              </Tarjeta>
+
+              {usuario?.rol === 'admin' && (
+                <View style={s.filaBotones}>
+                  <Boton titulo="Editar" icono="create-outline" variante="secundario" estilo={{ flex: 1 }}
+                    onPress={() => router.push(`/lugar/form?id=${l.id}`)} />
+                  <Boton titulo="Desactivar" icono="trash-outline" variante="peligro" estilo={{ flex: 1 }}
+                    onPress={borrar} cargando={borrando} />
+                </View>
+              )}
+
+              <Seccion sobretitulo="Actividad" titulo="Últimos check-ins" />
             </View>
-            {usuario?.rol === 'admin' && <View style={s.filaBotones}>
-              <Boton titulo="Editar" variante="secundario" estilo={{ flex: 1 }} onPress={() => router.push(`/lugar/form?id=${l.id}`)} />
-              <Boton titulo="Desactivar" variante="peligro" estilo={{ flex: 1 }} onPress={borrar} cargando={borrando} />
-            </View>}
-
-            <Text style={s.subtitulo}>Últimos check-ins</Text>
           </View>
         }
         renderItem={({ item }) => (
-          <ItemCheckin
-            checkin={item}
-            mostrar="usuario"
-            onPress={item.usuario.id === usuario?.id ? () => router.push(`/checkin/form?id=${item.id}`) : undefined}
-          />
+          <View style={{ paddingHorizontal: 18 }}>
+            <ItemCheckin
+              checkin={item}
+              mostrar="usuario"
+              onPress={item.usuario.id === usuario?.id ? () => router.push(`/checkin/form?id=${item.id}`) : undefined}
+            />
+          </View>
         )}
         ListFooterComponent={
-          <View>
+          <View style={{ paddingHorizontal: 18 }}>
             <Estado
               cargando={checkins.cargando}
               error={checkins.error}
               onReintentar={checkins.recargar}
-              vacio={!checkins.cargando && checkins.items.length === 0 && 'Nadie hizo check-in acá todavía'}
+              vacio={!checkins.cargando && checkins.items.length === 0 && 'Nadie hizo check-in acá todavía. ¡Sé el primero!'}
             />
             {checkins.hayMas && !checkins.cargando && (
               <Boton titulo="Ver más" variante="secundario" onPress={checkins.cargarMas} />
             )}
-            <Text style={[s.suave, { marginTop: 12, color: colores.suave }]}>
-              Los check-ins de otros usuarios no se pueden editar.
-            </Text>
           </View>
         }
       />

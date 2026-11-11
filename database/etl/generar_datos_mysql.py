@@ -110,7 +110,7 @@ def direccion(fila: dict[str, str]) -> str | None:
 def generar() -> dict[str, int]:
     MODELO.write_text(
         (RAIZ / "backend" / "dev" / "schema_mysql_dev.sql").read_text(encoding="utf-8"),
-        encoding="utf-8",
+        encoding="utf-8", newline="\n",
     )
     barrios_raw = leer("barrios.csv")
     fuentes = leer("fuentes.csv")
@@ -135,11 +135,19 @@ def generar() -> dict[str, int]:
     categorias_clave = sorted({
         (f["fuente_id"], f["tipo_id"] or "") for f in lugares_raw
     }, key=lambda x: (int(x[0]), int(x[1]) if x[1].isdigit() else 9999))
+    # Una categoría es única por (nombre, tipo) sin distinguir acentos, igual que la
+    # restricción UNIQUE de MySQL (collation *_ai_ci). La fuente trae variantes como
+    # "OLEO S/TELA" y "ÖLEO S/TELA": se consolidan en la primera que aparece.
     categorias: dict[tuple[str, str], tuple[int, str, int]] = {}
+    categoria_por_clave: dict[tuple[str, int], tuple[int, str, int]] = {}
     for clave in categorias_clave:
         fuente_id, tipo_id = clave
         nombre = tipos.get(tipo_id, "Sin clasificar")
-        categorias[clave] = (len(categorias) + 1, nombre, TIPOS_APP[fuente_id][0])
+        id_tipo = TIPOS_APP[fuente_id][0]
+        unica = (clave_texto(nombre), id_tipo)
+        if unica not in categoria_por_clave:
+            categoria_por_clave[unica] = (len(categoria_por_clave) + 1, nombre, id_tipo)
+        categorias[clave] = categoria_por_clave[unica]
 
     lineas = [
         "-- Generado por database/etl/generar_datos_mysql.py",
@@ -162,7 +170,7 @@ def generar() -> dict[str, int]:
     )
     lineas.extend(
         f"INSERT INTO categoria (id_categoria,nombre,id_tipo) VALUES ({id_},{sql(nombre)},{id_tipo});"
-        for id_, nombre, id_tipo in categorias.values()
+        for id_, nombre, id_tipo in categoria_por_clave.values()
     )
 
     omitidos = Counter()
@@ -201,8 +209,8 @@ def generar() -> dict[str, int]:
             f"({id_},{sql(usuario)},{sql(nombre)},{sql(email)},{sql(hash_demo(usuario, password))},{sql(rol)});"
         )
     lineas.extend(["COMMIT;", ""])
-    SALIDA.write_text("\n".join(lineas), encoding="utf-8")
-    return {"lugares": cargados, "barrios": len(barrios), "categorias": len(categorias), **omitidos}
+    SALIDA.write_text("\n".join(lineas), encoding="utf-8", newline="\n")
+    return {"lugares": cargados, "barrios": len(barrios), "categorias": len(categoria_por_clave), **omitidos}
 
 
 if __name__ == "__main__":

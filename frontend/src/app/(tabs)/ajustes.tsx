@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Switch, Text, View } from 'react-native';
 
-import { avisar, Boton, Campo, Chip, colores, s, Tarjeta } from '@/components/ui';
+import { avisar, Boton, Campo, Chip, colores, colorMotor, fuentes, s, Tarjeta } from '@/components/ui';
 import { mensajeError, useApi, useCarga } from '@/lib/api';
 import { useConfig } from '@/lib/config';
 import type { Pagina, Usuario } from '@/lib/tipos';
@@ -78,7 +78,7 @@ export default function Ajustes() {
           <Text style={s.subtitulo}>Administración</Text>
           <Boton titulo="Revisar sugerencias" onPress={() => router.push('/admin/sugerencias')} />
           <Tarjeta>
-            <Text style={{ fontWeight: '700', color: colores.texto, marginBottom: 8 }}>Crear una cuenta</Text>
+            <Text style={{ fontFamily: fuentes.negrita, color: colores.texto, marginBottom: 8 }}>Crear una cuenta</Text>
             <Campo etiqueta="Nombre de usuario" value={nuevo.nombre_usuario} autoCapitalize="none"
               onChangeText={(t) => setNuevo({ ...nuevo, nombre_usuario: t })} />
             <Campo etiqueta="Nombre" value={nuevo.nombre} onChangeText={(t) => setNuevo({ ...nuevo, nombre: t })} />
@@ -103,9 +103,26 @@ export default function Ajustes() {
       <Campo etiqueta="URL" value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} />
       <Boton titulo="Guardar y probar conexión" variante="secundario" onPress={probar} cargando={probando} />
 
+      <Text style={s.subtitulo}>Motor de base de datos</Text>
+      <Tarjeta>
+        <Text style={[s.suave, { marginBottom: 10, lineHeight: 19 }]}>
+          En automático, el backend usa MySQL para el catálogo y las escrituras, y HBase para historiales,
+          pasaporte y rankings. Forzando un motor, las mismas lecturas se resuelven con esa implementación.
+          Las escrituras siempre van a MySQL y se replican a HBase.
+        </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+          {(['auto', 'mysql', 'hbase'] as const).map((m) => (
+            <Chip key={m} texto={m === 'auto' ? 'Automático' : m.toUpperCase()} activo={cfg.motor === m}
+              color={m === 'auto' ? colores.primario : colorMotor(m)}
+              icono={m === 'auto' ? 'sparkles' : 'server'}
+              onPress={() => cfg.cambiar({ motor: m })} />
+          ))}
+        </View>
+      </Tarjeta>
+
       <Text style={s.subtitulo}>Diagnóstico</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ color: colores.texto, flex: 1 }}>Mostrar qué base resolvió cada operación</Text>
+        <Text style={{ color: colores.texto, flex: 1, fontFamily: fuentes.medio }}>Mostrar qué base resolvió cada operación</Text>
         <Switch value={cfg.debug} onValueChange={(v) => cfg.cambiar({ debug: v })} />
       </View>
       <Boton titulo="Cerrar sesión" variante="peligro" onPress={salir} estilo={{ marginTop: 24 }} />

@@ -5,7 +5,10 @@ import Constants from 'expo-constants';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 
-import type { Meta, Sesion, Usuario } from './tipos';
+import type { Meta, Motor, Sesion, Usuario } from './tipos';
+
+/** 'auto': el backend elige el motor según la responsabilidad. Forzarlo solo afecta lecturas (modo demo). */
+export type MotorElegido = 'auto' | Motor;
 
 const CLAVE = 'pasaporteba:config:v2';
 
@@ -20,11 +23,12 @@ interface Persistida {
   token: string | null;
   usuario: Usuario | null;
   debug: boolean;
+  motor: MotorElegido;
 }
 
 interface ConfigCtx extends Persistida {
   cargado: boolean;
-  cambiar: (cambios: Partial<Pick<Persistida, 'apiUrl' | 'debug'>>) => void;
+  cambiar: (cambios: Partial<Pick<Persistida, 'apiUrl' | 'debug' | 'motor'>>) => void;
   establecerSesion: (sesion: Sesion) => void;
   limpiarSesion: () => void;
   historial: Registro[];
@@ -42,7 +46,7 @@ const Contexto = createContext<ConfigCtx | null>(null);
 export function ConfigProvider({ children }: { children: ReactNode }) {
   const [cargado, setCargado] = useState(false);
   const [valores, setValores] = useState<Persistida>({
-    apiUrl: urlPorDefecto(), token: null, usuario: null, debug: true,
+    apiUrl: urlPorDefecto(), token: null, usuario: null, debug: true, motor: 'auto',
   });
   const [historial, setHistorial] = useState<Registro[]>([]);
 
@@ -60,7 +64,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     return nuevo;
   }, []);
 
-  const cambiar = useCallback((cambios: Partial<Pick<Persistida, 'apiUrl' | 'debug'>>) => {
+  const cambiar = useCallback((cambios: Partial<Pick<Persistida, 'apiUrl' | 'debug' | 'motor'>>) => {
     setValores((v) => guardar({ ...v, ...cambios }));
   }, [guardar]);
 

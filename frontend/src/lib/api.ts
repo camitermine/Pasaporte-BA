@@ -27,7 +27,7 @@ export function mensajeError(e: unknown): string {
 }
 
 export function useApi() {
-  const { apiUrl, token, limpiarSesion, registrarMeta } = useConfig();
+  const { apiUrl, token, motor, limpiarSesion, registrarMeta } = useConfig();
 
   return useMemo(() => {
     async function pedir<T>(metodo: string, ruta: string, cuerpo?: unknown): Promise<T> {
@@ -40,6 +40,8 @@ export function useApi() {
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            // Modo demo del polimorfismo: el backend lo aplica solo a lecturas.
+            ...(motor !== 'auto' ? { 'X-Motor': motor } : {}),
           },
           body: cuerpo !== undefined ? JSON.stringify(cuerpo) : undefined,
           signal: controlador.signal,
@@ -69,7 +71,7 @@ export function useApi() {
       put: <T>(ruta: string, cuerpo: unknown) => pedir<T>('PUT', ruta, cuerpo),
       del: <T>(ruta: string) => pedir<T>('DELETE', ruta),
     };
-  }, [apiUrl, token, limpiarSesion, registrarMeta]);
+  }, [apiUrl, token, motor, limpiarSesion, registrarMeta]);
 }
 
 /** Construye un query string ignorando valores vacíos. */
@@ -82,7 +84,7 @@ export function qs(params: Record<string, string | number | null | undefined>): 
 
 /** Carga datos al enfocar la pantalla y cada vez que cambian las dependencias o el motor. */
 export function useCarga<T>(fn: () => Promise<T>, deps: unknown[]) {
-  const { token, apiUrl } = useConfig();
+  const { token, apiUrl, motor } = useConfig();
   const [datos, setDatos] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -106,7 +108,7 @@ export function useCarga<T>(fn: () => Promise<T>, deps: unknown[]) {
     useCallback(() => {
       recargar();
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [recargar, token, apiUrl, depsKey]),
+    }, [recargar, token, apiUrl, motor, depsKey]),
   );
 
   return { datos, error, cargando, recargar };
@@ -115,7 +117,7 @@ export function useCarga<T>(fn: () => Promise<T>, deps: unknown[]) {
 /** Listado paginado por cursor (el cursor lo arma cada motor; para la app es opaco). */
 export function usePaginado<T>(ruta: (cursor: string | null) => string, deps: unknown[]) {
   const api = useApi();
-  const { token, apiUrl } = useConfig();
+  const { token, apiUrl, motor } = useConfig();
   const [items, setItems] = useState<T[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -148,7 +150,7 @@ export function usePaginado<T>(ruta: (cursor: string | null) => string, deps: un
     useCallback(() => {
       cargar(null);
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cargar, token, apiUrl, depsKey]),
+    }, [cargar, token, apiUrl, motor, depsKey]),
   );
 
   return {

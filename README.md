@@ -70,9 +70,15 @@ del repositorio en PowerShell.
 
 ```powershell
 docker compose up -d
-Get-Content backend\dev\schema_mysql_dev.sql -Raw | docker exec -i pasaporteba-mysql mysql -upasaporte -ppasaporte pasaporteba
-Get-Content database\mysql\datos_iniciales.sql -Raw | docker exec -i pasaporteba-mysql mysql -upasaporte -ppasaporte pasaporteba
+cmd /c "docker exec -i pasaporteba-mysql mysql --default-character-set=utf8mb4 -upasaporte -ppasaporte pasaporteba < database\mysql\modelo_relacional.sql"
+cmd /c "docker exec -i pasaporteba-mysql mysql --default-character-set=utf8mb4 -upasaporte -ppasaporte pasaporteba < database\mysql\datos_iniciales.sql"
 ```
+
+Si MySQL todavía está arrancando, el primer comando falla con un error de conexión: esperar
+unos segundos y repetirlo. Se usa `cmd /c` con `<` porque el pipe de PowerShell 5.1
+(`Get-Content | docker exec`) cambia la codificación y rompe las tildes y las ñ. Estos comandos
+**borran y recrean** la base local; hay que volver a correrlos cada vez que cambia
+`datos_iniciales.sql`, y después recargar HBase (paso 2).
 
 ### 2. Backend
 

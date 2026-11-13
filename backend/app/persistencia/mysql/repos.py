@@ -102,6 +102,9 @@ class LugaresMySQL(_BaseMySQL, RepoLugares):
         if filtro.id_categoria is not None:
             condiciones.append("l.id_categoria = :categoria")
             params["categoria"] = filtro.id_categoria
+        elif filtro.tipo:
+            condiciones.append("t.nombre = :tipo")
+            params["tipo"] = filtro.tipo
         if filtro.q:
             condiciones.append("l.nombre LIKE :q")
             params["q"] = f"%{filtro.q}%"

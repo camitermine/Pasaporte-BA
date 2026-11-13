@@ -178,7 +178,14 @@ class LugaresHBase(_BaseHBase, RepoLugares):
     def listar(self, filtro: FiltroLugares, limite: int, cursor: str | None) -> Pagina[Lugar]:
         # Elegimos la tabla según el filtro: cada filtro necesita su propia tabla índice.
         filtros = []
-        if filtro.id_barrio is not None:
+        if filtro.tipo and filtro.id_categoria is None:
+            # "lugares" ya contiene tipo y barrio desnormalizados. Esto permite combinar
+            # ambos filtros sin una tabla intermedia ni lecturas adicionales.
+            tabla, pref = "lugares", None
+            filtros.append(_filtro_columna("tipo", "binary", filtro.tipo))
+            if filtro.id_barrio is not None:
+                filtros.append(_filtro_columna("id_barrio", "binary", str(filtro.id_barrio)))
+        elif filtro.id_barrio is not None:
             tabla, pref = "lugares_por_barrio", prefijo(filtro.id_barrio)
             if filtro.id_categoria is not None:
                 filtros.append(_filtro_columna("id_categoria", "binary", str(filtro.id_categoria)))

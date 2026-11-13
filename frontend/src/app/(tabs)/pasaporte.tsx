@@ -3,7 +3,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { FlatList, Text, View } from 'react-native';
+import { useState } from 'react';
+import { FlatList, Pressable, Text, View } from 'react-native';
 
 import { ItemCheckin } from '@/components/Items';
 import { colores, Estado, fuentes, nombrePropio, s, Seccion, Sobretitulo } from '@/components/ui';
@@ -20,12 +21,20 @@ export default function PasaporteScreen() {
 
 function Contenido({ idUsuario }: { idUsuario: number }) {
   const api = useApi();
+  const [sellosDesplegados, setSellosDesplegados] = useState(false);
   const pasaporte = useCarga(() => api.get<Pasaporte>(`/consultas/pasaporte/${idUsuario}`), [idUsuario]);
   const checkins = usePaginado<Checkin>(
     (cursor) => `/usuarios/${idUsuario}/checkins${qs({ cursor, limite: 15 })}`,
     [idUsuario],
   );
   const p = pasaporte.datos;
+  const sellos = p ? [
+    ...p.barrios_visitados.map((b, i) => ({
+      barrio: b.barrio, checkins: b.checkins, color: COLORES_SELLO[i % COLORES_SELLO.length],
+    })),
+    ...p.barrios_faltantes.map((b) => ({ barrio: b, checkins: undefined, color: undefined })),
+  ] : [];
+  const sellosVisibles = sellosDesplegados ? sellos : sellos.slice(0, 8);
 
   return (
     <View style={s.pantalla}>
@@ -63,11 +72,31 @@ function Contenido({ idUsuario }: { idUsuario: number }) {
 
               <Seccion sobretitulo={`${p.barrios_visitados.length} conseguidos`} titulo="Sellos por barrio" />
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 }}>
-                {p.barrios_visitados.map((b, i) => (
-                  <Sello key={b.barrio.id} barrio={b.barrio} checkins={b.checkins} color={COLORES_SELLO[i % COLORES_SELLO.length]} />
+                {sellosVisibles.map((sello) => (
+                  <Sello key={sello.barrio.id} barrio={sello.barrio} checkins={sello.checkins} color={sello.color} />
                 ))}
-                {p.barrios_faltantes.map((b) => <Sello key={b.id} barrio={b} />)}
               </View>
+              {sellos.length > 8 ? (
+                <Pressable
+                  onPress={() => setSellosDesplegados((actual) => !actual)}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: sellosDesplegados }}
+                  style={({ pressed }) => ({
+                    alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6,
+                    marginTop: 16, paddingVertical: 9, paddingHorizontal: 16, borderRadius: 999,
+                    borderWidth: 1.5, borderColor: colores.borde, backgroundColor: colores.blanco,
+                    opacity: pressed ? 0.7 : 1,
+                  })}>
+                  <Text style={{ color: colores.primario, fontFamily: fuentes.negrita, fontSize: 13 }}>
+                    {sellosDesplegados ? 'Ver menos' : `Ver ${sellos.length - 8} barrios más`}
+                  </Text>
+                  <Ionicons
+                    name={sellosDesplegados ? 'chevron-up' : 'chevron-down'}
+                    size={15}
+                    color={colores.primario}
+                  />
+                </Pressable>
+              ) : null}
               <Seccion sobretitulo="Historial" titulo="Mis check-ins" />
             </View>
           ) : (

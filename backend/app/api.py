@@ -161,8 +161,13 @@ def categorias(p: P):
 
 @router.get("/lugares", tags=["lugares"])
 def listar_lugares(p: P, barrio: int | None = None, categoria: int | None = None,
-                   q: str | None = None, limite: Limite = 20, cursor: str | None = None):
-    filtro = FiltroLugares(id_barrio=barrio, id_categoria=categoria, q=q or None)
+                   tipo: str | None = None, q: str | None = None,
+                   limite: Limite = 20, cursor: str | None = None):
+    # Una categoría ya determina su tipo; si vienen ambos, la categoría tiene prioridad.
+    filtro = FiltroLugares(
+        id_barrio=barrio, id_categoria=categoria,
+        tipo=None if categoria is not None else (tipo or None), q=q or None,
+    )
     return ok(p, p.lugares.listar(filtro, limite, cursor))
 
 

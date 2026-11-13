@@ -8,7 +8,7 @@ import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 
 import { ItemLugar } from '@/components/Items';
 import { Selector } from '@/components/Selector';
-import { colores, Estado, fuentes, nombrePropio, s, Seccion, Sobretitulo } from '@/components/ui';
+import { colores, Estado, fuentes, nombrePropio, s, Seccion, Sobretitulo, tipoDe } from '@/components/ui';
 import { qs, useApi, useCarga, usePaginado } from '@/lib/api';
 import { useConfig } from '@/lib/config';
 import type { Barrio, Categoria, Lugar, Pasaporte } from '@/lib/tipos';
@@ -19,6 +19,7 @@ export default function Explorar() {
   const [texto, setTexto] = useState('');
   const [q, setQ] = useState('');
   const [barrio, setBarrio] = useState<number | null>(null);
+  const [tipo, setTipo] = useState<string | null>(null);
   const [categoria, setCategoria] = useState<number | null>(null);
 
   // Espera a que el usuario deje de tipear antes de buscar
@@ -41,11 +42,13 @@ export default function Explorar() {
   );
 
   const lista = usePaginado<Lugar>(
-    (cursor) => `/lugares${qs({ barrio, categoria, q, cursor, limite: 20 })}`,
-    [barrio, categoria, q],
+    (cursor) => `/lugares${qs({ barrio, tipo, categoria, q, cursor, limite: 20 })}`,
+    [barrio, tipo, categoria, q],
   );
 
-  const hayFiltros = barrio !== null || categoria !== null || q !== '';
+  const tipos = Array.from(new Set((catalogo.datos?.categorias ?? []).map((c) => c.tipo)));
+  const categoriasDelTipo = (catalogo.datos?.categorias ?? []).filter((c) => c.tipo === tipo);
+  const hayFiltros = barrio !== null || tipo !== null || categoria !== null || q !== '';
 
   return (
     <View style={s.pantalla}>
@@ -79,28 +82,55 @@ export default function Explorar() {
               ) : null}
             </View>
 
+            <Text style={[s.etiqueta, { marginBottom: 8 }]}>Tipo de lugar</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
               <Pressable
-                onPress={() => { setBarrio(null); setCategoria(null); setTexto(''); }}
+                onPress={() => { setBarrio(null); setTipo(null); setCategoria(null); setTexto(''); }}
                 style={[s.chip, !hayFiltros
                   ? { backgroundColor: colores.primario, borderColor: colores.primario }
                   : { backgroundColor: colores.blanco, borderColor: colores.borde }]}>
                 <Ionicons name="sparkles" size={13} color={!hayFiltros ? colores.blanco : colores.primario} />
                 <Text style={{ fontFamily: fuentes.medio, fontSize: 13, color: !hayFiltros ? colores.blanco : colores.texto }}>Todos</Text>
               </Pressable>
+              {tipos.map((nombreTipo) => {
+                const estilo = tipoDe(nombreTipo);
+                const activo = tipo === nombreTipo;
+                return (
+                  <Pressable
+                    key={nombreTipo}
+                    onPress={() => {
+                      setTipo(activo ? null : nombreTipo);
+                      setCategoria(null);
+                    }}
+                    style={[s.chip, activo
+                      ? { backgroundColor: estilo.color, borderColor: estilo.color }
+                      : { backgroundColor: colores.blanco, borderColor: colores.borde }]}>
+                    <Ionicons name={estilo.icono} size={13} color={activo ? colores.blanco : estilo.color} />
+                    <Text style={{ fontFamily: fuentes.medio, fontSize: 13, color: activo ? colores.blanco : colores.texto }}>
+                      {estilo.etiqueta}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={[s.etiqueta, { marginTop: 4, marginBottom: 8 }]}>Afinar búsqueda</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
               <Selector compacto
                 etiqueta="Barrio"
                 opciones={(catalogo.datos?.barrios ?? []).map((b) => ({ id: b.id, etiqueta: nombrePropio(b.nombre), detalle: `Comuna ${b.comuna}` }))}
                 valor={barrio}
                 onCambiar={setBarrio}
               />
-              <Selector compacto
-                etiqueta="Categoría"
-                opciones={(catalogo.datos?.categorias ?? []).map((c) => ({ id: c.id, etiqueta: nombrePropio(c.nombre), detalle: c.tipo }))}
-                valor={categoria}
-                onCambiar={setCategoria}
-                textoVacio="Todas"
-              />
+              {tipo ? (
+                <Selector compacto
+                  etiqueta="Categoría"
+                  opciones={categoriasDelTipo.map((c) => ({ id: c.id, etiqueta: nombrePropio(c.nombre) }))}
+                  valor={categoria}
+                  onCambiar={setCategoria}
+                  textoVacio="Todas"
+                />
+              ) : null}
             </View>
 
             <Pressable

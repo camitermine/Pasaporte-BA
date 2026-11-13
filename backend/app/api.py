@@ -56,6 +56,16 @@ P = Annotated[Persistencia, Depends(persistencia)]
 Limite = Annotated[int, Query(ge=1, le=100)]
 
 
+def persistencia_mysql(request: Request) -> Persistencia:
+    """Persistencia para operaciones que, por diseño, son exclusivamente relacionales."""
+    p = crear_persistencia("mysql")
+    request.state.persistencia = p
+    return p
+
+
+PM = Annotated[Persistencia, Depends(persistencia_mysql)]
+
+
 def persistencia_actividad(request: Request, forzado: Forzado) -> Persistencia:
     # Modo automatico: escritura canonica en MySQL + lecturas de actividad desde HBase.
     p = crear_persistencia(forzado) if forzado else crear_persistencia_actividad()
@@ -75,7 +85,7 @@ def _token(authorization: Annotated[str | None, Header()] = None) -> str:
     return token
 
 
-def usuario_actual(p: P, token: Annotated[str, Depends(_token)]) -> Usuario:
+def usuario_actual(p: PM, token: Annotated[str, Depends(_token)]) -> Usuario:
     return CuentasMySQL(p.traza).autenticar(token)
 
 
@@ -110,17 +120,17 @@ def ok(p: Persistencia, data) -> dict:
 # ---------------------------------------------------------------- autenticacion
 
 @router.post("/auth/login", tags=["autenticación"])
-def login(p: P, datos: LoginIn):
+def login(p: PM, datos: LoginIn):
     return ok(p, CuentasMySQL(p.traza).login(datos.usuario, datos.password))
 
 
 @router.get("/auth/me", tags=["autenticación"])
-def mi_sesion(p: P, actual: Actual):
+def mi_sesion(p: PM, actual: Actual):
     return ok(p, actual)
 
 
 @router.post("/auth/logout", tags=["autenticación"])
-def logout(p: P, token: Token):
+def logout(p: PM, token: Token):
     CuentasMySQL(p.traza).logout(token)
     return ok(p, {"sesion_cerrada": True})
 
@@ -168,7 +178,7 @@ def obtener_lugar(p: P, id_lugar: int):
 
 
 @router.post("/lugares", tags=["lugares"], status_code=201)
-def crear_lugar(p: P, actual: Actual, datos: LugarIn):
+def crear_lugar(p: PM, actual: Actual, datos: LugarIn):
     exigir_admin(actual)
     lugar = p.lugares.crear(datos)
     proyectar_lugar_si_corresponde(p, lugar)
@@ -176,7 +186,7 @@ def crear_lugar(p: P, actual: Actual, datos: LugarIn):
 
 
 @router.put("/lugares/{id_lugar}", tags=["lugares"])
-def actualizar_lugar(p: P, actual: Actual, id_lugar: int, datos: LugarIn):
+def actualizar_lugar(p: PM, actual: Actual, id_lugar: int, datos: LugarIn):
     exigir_admin(actual)
     lugar = p.lugares.actualizar(id_lugar, datos)
     proyectar_lugar_si_corresponde(p, lugar)
@@ -184,7 +194,7 @@ def actualizar_lugar(p: P, actual: Actual, id_lugar: int, datos: LugarIn):
 
 
 @router.delete("/lugares/{id_lugar}", tags=["lugares"])
-def eliminar_lugar(p: P, actual: Actual, id_lugar: int):
+def eliminar_lugar(p: PM, actual: Actual, id_lugar: int):
     exigir_admin(actual)
     p.lugares.eliminar(id_lugar)
     if settings.actividad_db.lower() == "hbase":
@@ -212,7 +222,7 @@ def obtener_usuario(p: P, actual: Actual, id_usuario: int):
 
 
 @router.post("/usuarios", tags=["usuarios"], status_code=201)
-def crear_usuario(p: P, actual: Actual, datos: UsuarioCrear):
+def crear_usuario(p: PM, actual: Actual, datos: UsuarioCrear):
     exigir_admin(actual)
     usuario = CuentasMySQL(p.traza).crear_usuario(datos)
     proyectar_usuario_si_corresponde(p, usuario)
@@ -229,23 +239,23 @@ def checkins_de_usuario(p: A, actual: Actual, id_usuario: int,
 # ---------------------------------------------------------------- favoritos
 
 @router.get("/me/favoritos", tags=["favoritos"])
-def listar_favoritos(p: P, actual: Actual, limite: Limite = 50, cursor: str | None = None):
+def listar_favoritos(p: PM, actual: Actual, limite: Limite = 50, cursor: str | None = None):
     return ok(p, FavoritosMySQL(p.traza).listar(actual.id, limite, cursor))
 
 
 @router.get("/me/favoritos/{id_lugar}", tags=["favoritos"])
-def consultar_favorito(p: P, actual: Actual, id_lugar: int):
+def consultar_favorito(p: PM, actual: Actual, id_lugar: int):
     return ok(p, {"favorito": FavoritosMySQL(p.traza).contiene(actual.id, id_lugar)})
 
 
 @router.put("/me/favoritos/{id_lugar}", tags=["favoritos"])
-def agregar_favorito(p: P, actual: Actual, id_lugar: int):
+def agregar_favorito(p: PM, actual: Actual, id_lugar: int):
     FavoritosMySQL(p.traza).agregar(actual.id, id_lugar)
     return ok(p, {"favorito": True})
 
 
 @router.delete("/me/favoritos/{id_lugar}", tags=["favoritos"])
-def quitar_favorito(p: P, actual: Actual, id_lugar: int):
+def quitar_favorito(p: PM, actual: Actual, id_lugar: int):
     FavoritosMySQL(p.traza).quitar(actual.id, id_lugar)
     return ok(p, {"favorito": False})
 
@@ -253,18 +263,18 @@ def quitar_favorito(p: P, actual: Actual, id_lugar: int):
 # ---------------------------------------------------------------- sugerencias y moderacion
 
 @router.post("/sugerencias", tags=["sugerencias"], status_code=201)
-def crear_sugerencia(p: P, actual: Actual, datos: SugerenciaLugarIn):
+def crear_sugerencia(p: PM, actual: Actual, datos: SugerenciaLugarIn):
     return ok(p, SugerenciasMySQL(p.traza).crear(actual.id, datos))
 
 
 @router.get("/sugerencias", tags=["sugerencias"])
-def listar_sugerencias(p: P, actual: Actual,
+def listar_sugerencias(p: PM, actual: Actual,
                        estado: Annotated[str | None, Query(pattern="^(pendiente|aprobada|rechazada)$")] = None):
     return ok(p, SugerenciasMySQL(p.traza).listar(actual, estado))
 
 
 @router.put("/sugerencias/{id_sugerencia}/revision", tags=["sugerencias"])
-def revisar_sugerencia(p: P, actual: Actual, id_sugerencia: int, revision: RevisionSugerencia):
+def revisar_sugerencia(p: PM, actual: Actual, id_sugerencia: int, revision: RevisionSugerencia):
     exigir_admin(actual)
     resultado = SugerenciasMySQL(p.traza).revisar(id_sugerencia, actual, revision)
     if resultado.id_lugar_creado:

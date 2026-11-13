@@ -162,12 +162,14 @@ class CatalogoHBase(_BaseHBase, RepoCatalogo):
 # ---------------------------------------------------------------- lugares
 
 def _a_lugar(id_lugar: int, d: dict[str, str]) -> Lugar:
+    barrio = (Barrio(id=int(d["id_barrio"]), nombre=d["barrio"], comuna=int(d["comuna"]))
+              if "id_barrio" in d else None)
     return Lugar(
         id=id_lugar, nombre=d["nombre"], direccion=d.get("direccion"),
         latitud=float(d["lat"]) if "lat" in d else None,
         longitud=float(d["lon"]) if "lon" in d else None,
         categoria=Categoria(id=int(d["id_categoria"]), nombre=d["categoria"], tipo=d["tipo"]),
-        barrio=Barrio(id=int(d["id_barrio"]), nombre=d["barrio"], comuna=int(d["comuna"])),
+        barrio=barrio,
         fuente=d.get("fuente"),
     )
 
@@ -209,19 +211,22 @@ class LugaresHBase(_BaseHBase, RepoLugares):
 
     def crear(self, datos: LugarIn) -> Lugar:
         # Validamos antes de consumir un ID de la secuencia.
-        barrio, categoria = self._barrio(datos.id_barrio), self._categoria(datos.id_categoria)
+        barrio = self._barrio(datos.id_barrio) if datos.id_barrio is not None else None
+        categoria = self._categoria(datos.id_categoria)
         id_lugar = self._nuevo_id("lugar")
         return self._escribir(id_lugar, datos, barrio, categoria, fuente=None)
 
     def actualizar(self, id_lugar: int, datos: LugarIn) -> Lugar:
         anterior = self._lugar_crudo(id_lugar)
-        barrio, categoria = self._barrio(datos.id_barrio), self._categoria(datos.id_categoria)
+        barrio = self._barrio(datos.id_barrio) if datos.id_barrio is not None else None
+        categoria = self._categoria(datos.id_categoria)
         self._borrar_indices(id_lugar, anterior)
         # Las columnas opcionales que quedan vacías hay que borrarlas explícitamente.
         sin_coords = datos.latitud is None or datos.longitud is None
         vacias = [f"d:{c}".encode() for c, vacia in
                   (("direccion", datos.direccion is None), ("lat", sin_coords), ("lon", sin_coords),
-                   ("geohash", sin_coords))
+                   ("geohash", sin_coords), ("id_barrio", datos.id_barrio is None),
+                   ("barrio", datos.id_barrio is None), ("comuna", datos.id_barrio is None))
                   if vacia and c in anterior]
         if vacias:
             self._delete("lugares", clave(id_lugar), vacias)
@@ -256,7 +261,7 @@ class LugaresHBase(_BaseHBase, RepoLugares):
 
     # -- helpers
 
-    def _escribir(self, id_lugar: int, datos: LugarIn, barrio: Barrio, categoria: Categoria,
+    def _escribir(self, id_lugar: int, datos: LugarIn, barrio: Barrio | None, categoria: Categoria,
                   fuente: str | None) -> Lugar:
         tiene_coords = datos.latitud is not None and datos.longitud is not None
         gh = geohash.codificar(datos.latitud, datos.longitud, 6) if tiene_coords else None
@@ -265,23 +270,27 @@ class LugaresHBase(_BaseHBase, RepoLugares):
             "lat": datos.latitud if tiene_coords else None, "lon": datos.longitud if tiene_coords else None,
             "geohash": gh,
             "id_categoria": categoria.id, "categoria": categoria.nombre, "tipo": categoria.tipo,
-            "id_barrio": barrio.id, "barrio": barrio.nombre, "comuna": barrio.comuna,
+            "id_barrio": barrio.id if barrio else None,
+            "barrio": barrio.nombre if barrio else None,
+            "comuna": barrio.comuna if barrio else None,
             "fuente": fuente,
         }
         self._put("lugares", clave(id_lugar), a_celdas(fila))
         # Tablas índice (desnormalizadas): guardan lo necesario para filtrar sin ir a "lugares".
         nombre_min = datos.nombre.lower()
-        self._put("lugares_por_barrio", clave(barrio.id, id_lugar),
-                  a_celdas({"nombre": nombre_min, "id_categoria": categoria.id}))
+        if barrio:
+            self._put("lugares_por_barrio", clave(barrio.id, id_lugar),
+                      a_celdas({"nombre": nombre_min, "id_categoria": categoria.id}))
         self._put("lugares_por_categoria", clave(categoria.id, id_lugar),
-                  a_celdas({"nombre": nombre_min, "id_barrio": barrio.id}))
+                  a_celdas({"nombre": nombre_min, "id_barrio": barrio.id if barrio else None}))
         if gh:
             self._put("lugares_por_geohash", f"{gh}#{pad(id_lugar)}".encode(),
                       a_celdas({"lat": datos.latitud, "lon": datos.longitud}))
         return _a_lugar(id_lugar, {k: str(v) for k, v in fila.items() if v is not None})
 
     def _borrar_indices(self, id_lugar: int, d: dict[str, str]) -> None:
-        self._delete("lugares_por_barrio", clave(int(d["id_barrio"]), id_lugar))
+        if "id_barrio" in d:
+            self._delete("lugares_por_barrio", clave(int(d["id_barrio"]), id_lugar))
         self._delete("lugares_por_categoria", clave(int(d["id_categoria"]), id_lugar))
         if "geohash" in d:
             self._delete("lugares_por_geohash", f"{d['geohash']}#{pad(id_lugar)}".encode())

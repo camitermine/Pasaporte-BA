@@ -104,7 +104,7 @@ erDiagram
         int id_revisor FK "nullable"
         datetime fecha_revision
         varchar motivo_revision
-        int id_lugar_creado FK "nullable"
+        int id_lugar_creado FK, UK "nullable"
     }
     SESION {
         bigint id_sesion PK
@@ -128,5 +128,5 @@ erDiagram
 | Usuario – Lugar (Check-in) | N : M | Resuelta con la entidad **Check-in**, que tiene atributos propios (fecha, puntaje, comentario). Un usuario puede visitar el mismo lugar varias veces. |
 | Usuario – Lugar (Favorito) | N : M | Resuelta con la tabla **Favorito**, PK compuesta: un lugar se guarda una sola vez por usuario. |
 | Usuario – Sugerencia | 1 : N (autor) y 0..1 : N (revisor) | Dos relaciones distintas con la misma entidad. |
-| Sugerencia – Lugar | 0..1 : 0..1 | Una sugerencia aprobada genera como máximo un lugar. |
+| Sugerencia – Lugar | 0..1 : 0..1 | Una sugerencia aprobada genera como máximo un lugar y `id_lugar_creado` es único. |
 | Usuario – Sesión | 1 : N | Sesiones revocables; se guarda solo el hash del token. |

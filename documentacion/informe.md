@@ -1,376 +1,360 @@
 # Pasaporte BA — Informe del TP Integrador
 
-**Materia:** Base de Datos — Tecnicatura en Programación Informática (UNSAM)
-**Docentes:** Gabriel Flores, Rodrigo Casco
-**Integrantes:** <!-- TODO: nombres y apellidos -->
-**Fecha de entrega:** <!-- TODO -->
-**Repositorio:** <!-- TODO: URL de GitHub -->
-
-> Borrador de trabajo. Las partes marcadas con **TODO** las tiene que completar el grupo.
-> Al terminar, exportar a `documentacion/informe.pdf` (ver `documentacion/README.md`).
-
----
+**Materia:** Bases de Datos — Tecnicatura en Programación Informática (UNSAM)
+**Docentes:** Gabriel Flores y Rodrigo Casco
+**Integrantes:** completar con los nombres y apellidos de los cinco integrantes
+**Fecha de entrega:** noviembre de 2026
+**Repositorio:** <https://github.com/camitermine/Pasaporte-BA>
 
 ## 1. Descripción del problema
 
-Buenos Aires tiene miles de puntos de interés cultural y turístico: espacios culturales,
-monumentos, murales y bares y restaurantes notables. Esa información está publicada en datasets
-separados y no hay una forma simple de explorarla por barrio, registrar qué lugares se visitaron
-ni comparar qué lugares son los más visitados.
+Buenos Aires tiene miles de puntos de interés cultural, patrimonial, artístico y gastronómico
+publicados en fuentes separadas. **Pasaporte BA** los reúne en una aplicación móvil y web que
+permite explorar lugares por nombre, barrio, categoría o cercanía; guardarlos como favoritos;
+registrar visitas mediante check-ins; completar un pasaporte de barrios y consultar rankings.
 
-**Pasaporte BA** es una aplicación móvil (y web) donde cada persona:
+Existen dos roles. El usuario común explora, marca favoritos, registra y administra sus propios
+check-ins y propone lugares. El administrador crea cuentas, mantiene el catálogo y aprueba o
+rechaza sugerencias. Los usuarios comunes no pueden agregar, modificar ni eliminar lugares de
+forma directa.
 
-- explora y busca lugares por nombre, barrio o categoría, o por cercanía a su ubicación;
-- hace *check-in* en los lugares que visita, con puntaje y comentario opcionales;
-- completa un "pasaporte" con un sello por cada barrio visitado;
-- consulta el ranking mensual de lugares más visitados de cada barrio;
-- guarda favoritos y sugiere lugares que faltan.
+El problema combina dos clases de datos:
 
-Un administrador crea las cuentas, modera las sugerencias y mantiene el catálogo.
+- **Datos maestros y transaccionales:** usuarios, sesiones, roles, lugares, categorías,
+  favoritos, sugerencias y registro canónico de check-ins. Requieren relaciones, restricciones y
+  consistencia, por lo que MySQL es la fuente de verdad.
+- **Actividad y lecturas de alto volumen:** historiales, pasaporte, rankings e índices de
+  consulta. Se benefician de filas anchas, acceso por clave y agregados precalculados, por lo que
+  se proyectan en HBase.
 
-El problema combina dos tipos de datos con necesidades distintas:
+## 2. Origen y descripción del dataset
 
-- **Datos maestros** (lugares, barrios, categorías, usuarios): pocos cambios, muchas relaciones e
-  integridad estricta. Encajan en un modelo relacional.
-- **Actividad** (check-ins): crece sin parar, se escribe mucho y se lee siempre por usuario, por
-  lugar o por mes. Encaja en una base NoSQL orientada a columnas.
+Se integraron cuatro conjuntos del portal BA Data del Gobierno de la Ciudad de Buenos Aires. Las
+fichas oficiales indican licencia **CC BY 2.5 AR**. La fecha histórica exacta de descarga no quedó
+guardada junto con los CSV; para no inventarla, se registra que las fichas fueron consultadas el
+12/11/2026.
 
-## 2. Descripción y origen del dataset
+| Fuente local | Dataset oficial | Filas recibidas | URL oficial | Descarga / consulta | Licencia |
+|---|---|---:|---|---|---|
+| `espacios_culturales` | Espacios culturales | 3.056 | <https://data.buenosaires.gob.ar/dataset/espacios-culturales> | descarga no registrada; consulta 12/11/2026 | CC BY 2.5 AR |
+| `monumentos` | Monumentos | 2.051 | <https://data.buenosaires.gob.ar/dataset/monumentos> | descarga no registrada; consulta 12/11/2026 | CC BY 2.5 AR |
+| `murales` | Murales | 413 | <https://data.buenosaires.gob.ar/dataset/murales> | descarga no registrada; consulta 12/11/2026 | CC BY 2.5 AR |
+| `oferta_gastronomica` | Oferta de establecimientos gastronómicos | 2.812 | <https://data.buenosaires.gob.ar/dataset/oferta-establecimientos-gastronomicos> | descarga no registrada; consulta 12/11/2026 | CC BY 2.5 AR |
 
-Los datos provienen del portal de datos abiertos del Gobierno de la Ciudad de Buenos Aires
-(<https://data.buenosaires.gob.ar>), categoría *Cultura y turismo*. Se integraron **4 datasets**,
-uno por fuente:
+El material recibido ya estaba integrado en cuatro archivos de trabajo dentro de
+`database/datasets/tablas_3fn/`: `lugares.csv`, `barrios.csv`, `tipos.csv` y `fuentes.csv`. El
+archivo principal tiene 8.332 filas y las columnas `id`, `nombre`, `fuente_id`, `tipo_id`,
+`calle`, `calle_interseccion`, `altura`, `barrio_id`, `comuna`, `latitud` y `longitud`.
 
-| Fuente (en el CSV) | Dataset original | Tipo en la app | URL | Fecha de descarga | Licencia |
-|---|---|---|---|---|---|
-| `espacios_culturales` | <!-- TODO --> | Cultura | <!-- TODO --> | <!-- TODO --> | <!-- TODO --> |
-| `monumentos` | <!-- TODO --> | Patrimonio | <!-- TODO --> | <!-- TODO --> | <!-- TODO --> |
-| `murales` | <!-- TODO --> | Arte urbano | <!-- TODO --> | <!-- TODO --> | <!-- TODO --> |
-| `oferta_gastronomica` | <!-- TODO --> | Gastronomía | <!-- TODO --> | <!-- TODO --> | <!-- TODO --> |
+Después de la limpieza se obtuvieron:
 
-> **TODO:** confirmar con quien descargó los datos el nombre exacto de cada dataset, su URL y la
-> fecha. Los datasets de BA Data suelen publicarse con licencia CC BY 2.5 AR; verificarlo en la
-> ficha de cada uno. Cargar también la URL y la fecha en la tabla `fuente` (ya tiene las columnas
-> `url` y `fecha_descarga`).
-
-Después de unir y limpiar los datos, el sistema contiene:
-
-| Entidad | Registros |
-|---|---|
-| Lugares válidos | 8.322 (de 8.332 filas; 10 sin nombre descartadas) |
+| Entidad | Cantidad |
+|---|---:|
+| Lugares válidos | 8.322 |
 | Barrios | 48 |
 | Comunas | 15 |
 | Categorías de origen | 228 |
-| Tipos de la app | 4 |
+| Tipos agrupadores de la app | 4 |
 | Fuentes | 4 |
 
-## 3. Análisis inicial de los datos
+## 3. Análisis inicial y calidad de datos
 
-<!-- TODO: describir la estructura ORIGINAL de cada uno de los 4 datasets (columnas principales,
-cantidad de filas). Si se conservan los CSV originales, agregarlos en database/datasets/originales/. -->
+El perfilado se realizó sobre los CSV conservados. Por fuente se observaron estos faltantes:
 
-Problemas encontrados al analizar los datos:
+| Fuente | Sin nombre | Sin barrio | Sin coordenadas completas |
+|---|---:|---:|---:|
+| Espacios culturales | 0 | 1 | 22 |
+| Monumentos | 1 | 269 | 100 |
+| Murales | 9 | 0 | 0 |
+| Oferta gastronómica | 0 | 0 | 0 |
+| **Total** | **10** | **270** | **122** |
 
-| Problema | Ejemplo | Tipo de anomalía que provoca |
-|---|---|---|
-| El nombre del barrio se repite como texto en cada lugar | "PALERMO" en miles de filas | Actualización: renombrar un barrio implica tocar miles de filas. |
-| La comuna depende del barrio, no del lugar | `lugar → barrio → comuna` | Dependencia transitiva: el mismo barrio podría quedar con comunas distintas. |
-| La categoría se repite como texto | "MURAL", "BAR", "BUSTO" | Actualización e inconsistencias de escritura. |
-| Variantes del mismo valor | Núñez aparece dos veces en `barrios.csv` con distinta codificación; "OLEO S/TELA" y "ÖLEO S/TELA" | Datos duplicados que rompen restricciones `UNIQUE`. |
-| Texto mal codificado | caracteres con *mojibake* (Ã±, Ã©) | Datos ilegibles. |
-| Registros sin nombre | 10 filas | No se pueden mostrar ni identificar. |
-| Lugares sin barrio | 270 filas | No se puede saber a qué barrio pertenecen. |
-| Coordenadas incompletas | latitud sin longitud (1 caso) | Ubicación inválida. |
-| Dirección partida en 3 columnas | `calle`, `calle_interseccion`, `altura` | Se combinan en un único campo `direccion`. |
-| Nombres en mayúsculas y sin tildes | "AGRONOMIA", "CONSTITUCION" | Problema de presentación (pendiente, ver sección 15). |
-| Sin metadatos de origen | sin URL, fecha ni licencia | No se puede rastrear la procedencia. |
+También se encontraron repetición textual de barrios y categorías, dos representaciones de
+Núñez por codificación, categorías equivalentes por acentos, texto con *mojibake*, direcciones
+divididas en tres campos y un caso de coordenadas incompletas. Repetir barrio, comuna, categoría
+y tipo en cada lugar produciría anomalías de actualización e inconsistencias.
 
-## 4. Proceso de normalización
+Las decisiones de limpieza fueron conservadoras: se descartaron solamente los diez registros sin
+nombre; los 270 lugares sin barrio se conservaron con FK nula; las coordenadas incompletas se
+convirtieron en nulas; se reparó texto cuando era inequívoco y se consolidaron duplicados de
+codificación. No se inventaron valores ausentes.
 
-<!-- TODO: completar con la tabla original "plana" de cada dataset (0FN/1FN) para mostrar la
-evolución. Lo de abajo describe el resultado que ya está implementado. -->
+## 4. Evolución hasta tercera forma normal
 
-**Punto de partida (tabla única por dataset, sin normalizar):**
+La estructura plana común puede representarse así:
 
+```text
+LUGAR_ORIGINAL(id_origen, nombre, fuente, categoria, tipo,
+               calle, interseccion, altura, barrio, comuna,
+               latitud, longitud)
 ```
-LUGAR_ORIGINAL(id, nombre, fuente, tipo, calle, calle_interseccion, altura,
-               barrio, comuna, latitud, longitud)
-```
 
-**1FN.** Todos los atributos son atómicos y no hay grupos repetitivos. La dirección se trata
-como un único atributo descriptivo (no se consulta por calle).
+**Primera forma normal (1FN).** Cada fila representa un lugar y cada celda un valor simple. Para
+el uso de la aplicación, `calle`, `interseccion` y `altura` se transforman en el atributo
+descriptivo `direccion`; no se almacenan listas ni grupos repetitivos.
 
-**2FN.** La clave es simple (`id`), así que no hay dependencias parciales. Al unir los 4
-datasets se agrega `fuente` y el identificador pasa a ser `(fuente, id_origen)`, que se conserva
-como restricción `UNIQUE (id_fuente, id_origen)` para trazabilidad.
+**Segunda forma normal (2FN).** En cada fuente la clave original es simple. Al integrar fuentes,
+la identidad externa pasa a ser `(id_fuente, id_origen)`, combinación que queda protegida por una
+restricción `UNIQUE`. El nuevo `id_lugar` es la PK interna.
 
-**3FN.** Se eliminan las dependencias transitivas:
+**Tercera forma normal (3FN).** Se separan las dependencias transitivas:
 
-| Dependencia transitiva | Solución |
+| Dependencia | Descomposición aplicada |
 |---|---|
-| `lugar → barrio → comuna` | Tabla `barrio(id_barrio, nombre, id_comuna)` y tabla `comuna`. `lugar` solo guarda `id_barrio`. |
-| `lugar → categoría → tipo` | Tabla `categoria(id_categoria, nombre, id_tipo)` y `tipo_lugar`. |
-| `lugar → fuente → (nombre, url, fecha)` | Tabla `fuente`. |
+| `lugar → barrio → comuna` | `COMUNA`, `BARRIO(id_comuna)` y `LUGAR(id_barrio)` |
+| `lugar → categoría → tipo` | `TIPO_LUGAR`, `CATEGORIA(id_tipo)` y `LUGAR(id_categoria)` |
+| `lugar → fuente → metadatos` | `FUENTE` y `LUGAR(id_fuente, id_origen)` |
 
-**Resultado (3FN):**
+El resultado se completa con las entidades de la aplicación: `USUARIO`, `CHECKIN`, `FAVORITO`,
+`SUGERENCIA_LUGAR` y `SESION`. El ETL reproducible
+`database/etl/generar_datos_mysql.py` lee los CSV sin modificarlos y genera
+`database/mysql/datos_iniciales.sql`.
 
+## 5. Diagrama Entidad–Relación
+
+El DER completo y la explicación de cardinalidades están en `documentacion/DER.md`. Sus relaciones
+principales son:
+
+```text
+COMUNA 1 ── N BARRIO 0..1 ── N LUGAR N ── 1 CATEGORIA N ── 1 TIPO_LUGAR
+                              │
+FUENTE 0..1 ─────────────── N ┤
+                              ├── N CHECKIN N ── 1 USUARIO ── N SESION
+                              ├── N FAVORITO N ─ 1 USUARIO
+                              └── 0..1 SUGERENCIA_LUGAR N ─── 1 USUARIO (autor)
 ```
-COMUNA(id_comuna)
-BARRIO(id_barrio, nombre, id_comuna→COMUNA)
-TIPO_LUGAR(id_tipo, nombre)
-CATEGORIA(id_categoria, nombre, id_tipo→TIPO_LUGAR)
-FUENTE(id_fuente, nombre, url, fecha_descarga)
-LUGAR(id_lugar, nombre, direccion, latitud, longitud, id_categoria→CATEGORIA,
-      id_barrio→BARRIO, id_fuente→FUENTE, id_origen, activo, fecha_alta, fecha_modificacion)
-```
 
-A esto se suman las entidades propias de la aplicación, también en 3FN: `USUARIO`, `CHECKIN`,
-`FAVORITO`, `SUGERENCIA_LUGAR` y `SESION`.
-
-La limpieza la hace el ETL `database/etl/generar_datos_mysql.py`, que lee los CSV y genera
-`database/mysql/datos_iniciales.sql` sin modificar los originales.
-
-## 5. Diagrama Entidad-Relación
-
-Ver `documentacion/DER.md` (incluye el diagrama y la explicación de cada cardinalidad).
-
-<!-- TODO: insertar acá la imagen exportada: ![DER](DER.png) -->
+`CHECKIN` y `FAVORITO` resuelven relaciones N:M entre usuario y lugar. Una sugerencia aprobada
+puede crear como máximo un lugar, y un lugar puede estar asociado como máximo a una sugerencia;
+esto se garantiza con una FK nullable y `UNIQUE (id_lugar_creado)`.
 
 ## 6. Modelo relacional
 
-Motor: **MySQL 8.4**. Script completo: `database/mysql/modelo_relacional.sql`.
+Se implementó MySQL 8.4 en `database/mysql/modelo_relacional.sql`.
 
-| Tabla | PK | FK | Restricciones relevantes |
-|---|---|---|---|
-| `comuna` | `id_comuna` | — | `CHECK (id_comuna BETWEEN 1 AND 15)` |
-| `barrio` | `id_barrio` | `id_comuna → comuna` | `nombre UNIQUE` |
-| `tipo_lugar` | `id_tipo` | — | `nombre UNIQUE` |
-| `categoria` | `id_categoria` | `id_tipo → tipo_lugar` | `UNIQUE (nombre, id_tipo)` |
-| `fuente` | `id_fuente` | — | `nombre UNIQUE` |
-| `lugar` | `id_lugar` | `id_categoria`, `id_barrio` (nullable), `id_fuente` (nullable) | `UNIQUE (id_fuente, id_origen)`; índices por ubicación y por filtros; `activo` para baja lógica |
-| `usuario` | `id_usuario` | `id_barrio` (nullable) | `nombre_usuario UNIQUE`, `email UNIQUE`, `rol ENUM` |
-| `checkin` | `id_checkin` | `id_usuario`, `id_lugar` (`ON DELETE RESTRICT`) | `CHECK (puntaje BETWEEN 1 AND 5)`; índices `(id_lugar, fecha_hora)` y `(id_usuario, fecha_hora)` |
-| `favorito` | `(id_usuario, id_lugar)` | ambas con `ON DELETE CASCADE` | PK compuesta: no hay favoritos duplicados |
-| `sugerencia_lugar` | `id_sugerencia` | autor, revisor, categoría, barrio, lugar creado (`ON DELETE SET NULL`) | `estado ENUM`; índice `(estado, fecha_alta)` |
-| `sesion` | `id_sesion` | `id_usuario` (`ON DELETE CASCADE`) | `token_hash UNIQUE` |
+| Tabla | Clave y restricciones destacadas |
+|---|---|
+| `comuna` | PK `id_comuna`; `CHECK` entre 1 y 15 |
+| `barrio` | PK; FK a comuna; nombre único |
+| `tipo_lugar` | PK; nombre único |
+| `categoria` | PK; FK a tipo; `(nombre, id_tipo)` único |
+| `fuente` | PK; nombre único; URL y fecha de descarga nullable |
+| `lugar` | PK; FK a categoría, barrio y fuente; origen único; coordenadas; baja lógica |
+| `usuario` | PK; usuario y email únicos; rol; contraseña hasheada; baja lógica |
+| `checkin` | PK; FK a usuario y lugar; puntaje 1–5; comentario; verificación |
+| `favorito` | PK compuesta `(id_usuario, id_lugar)` |
+| `sugerencia_lugar` | PK; autor, revisor, estado y lugar creado único nullable |
+| `sesion` | PK; hash de token único; vencimiento y revocación |
 
-Decisiones:
+Las FKs protegen la integridad. Los lugares usan baja lógica porque un lugar visitado no debe
+perder su historial. Las contraseñas se guardan con PBKDF2-SHA256 y sal aleatoria; de cada sesión
+solo se persiste el hash SHA-256 del token. Los índices compuestos siguen los accesos reales por
+usuario/lugar y fecha.
 
-- **Baja lógica de lugares** (`activo = FALSE`): un lugar con check-ins no se puede borrar
-  físicamente (`ON DELETE RESTRICT`), porque se perdería historial.
-- **Contraseñas** con PBKDF2-SHA256 y salt aleatorio; de las sesiones se guarda solo el hash del
-  token.
-- Los índices compuestos siguen las consultas reales: el historial de un lugar o de un usuario
-  ordenado por fecha.
+## 7. Diseño NoSQL
 
-## 7. Diseño de la solución NoSQL
+Se eligió **Apache HBase 2.1**, base orientada a columnas anchas. Su utilización fue autorizada
+por los docentes y permite modelar directamente los patrones de lectura de actividad. HBase no
+reemplaza el modelo relacional: contiene una proyección reconstruible y optimizada.
 
-Motor: **Apache HBase 2.1** (base de datos orientada a columnas, modelo *wide-column*). Su uso
-fue autorizado por los docentes, ya que es el motor que el grupo trabajó en el TP de bases NoSQL.
-
-En HBase se guarda una **proyección desnormalizada** del catálogo y toda la **actividad**. Cada
-tabla está pensada para responder **una consulta concreta** con un único *scan* por prefijo de
-row key:
-
-| Tabla | Row key | Para qué consulta |
+| Tabla HBase | Row key | Acceso que resuelve |
 |---|---|---|
-| `lugares` | `<idLugar>` | Detalle de un lugar (incluye barrio, comuna y categoría copiados) |
-| `lugares_por_barrio` | `<idBarrio>#<idLugar>` | Listar lugares de un barrio |
-| `lugares_por_categoria` | `<idCategoria>#<idLugar>` | Listar lugares de una categoría |
-| `lugares_por_geohash` | `<geohash6>#<idLugar>` | Lugares cercanos a un punto |
-| `usuarios` / `usuarios_por_nombre` | `<idUsuario>` / `<nombre_usuario>` | Perfil y búsqueda por nombre |
-| `checkins` | `<idCheckin>` | Check-in individual |
-| `checkins_por_lugar` | `<idLugar>#<tsInvertido>#<idCheckin>` | Últimos check-ins de un lugar (los más nuevos primero) |
-| `checkins_por_usuario` | `<idUsuario>#<tsInvertido>#<idCheckin>` | Historial y pasaporte de un usuario |
-| `stats_lugar` | `<idLugar>` con columnas `m:<yyyyMM>` y `t:total` | Contadores atómicos para el ranking mensual |
-| `secuencias` | `lugar` / `usuario` / `checkin` | Generación de IDs (no hay `AUTO_INCREMENT`) |
+| `lugares` | `<idLugar>` | detalle desnormalizado |
+| `lugares_por_barrio` | `<idBarrio>#<idLugar>` | lugares de un barrio |
+| `lugares_por_categoria` | `<idCategoria>#<idLugar>` | lugares de una categoría |
+| `lugares_por_geohash` | `<geohash6>#<idLugar>` | candidatos cercanos |
+| `usuarios` | `<idUsuario>` | perfil necesario para actividad |
+| `usuarios_por_nombre` | `<nombreUsuario>` | índice de búsqueda |
+| `checkins` | `<idCheckin>` | detalle de check-in |
+| `checkins_por_lugar` | `<idLugar>#<tsInvertido>#<idCheckin>` | actividad reciente de un lugar |
+| `checkins_por_usuario` | `<idUsuario>#<tsInvertido>#<idCheckin>` | historial y pasaporte |
+| `stats_lugar` | `<idLugar>`; columnas `m:yyyyMM` y `t:total` | ranking y totales |
+| `secuencias` | nombre de entidad | contadores de IDs |
 
-Técnicas de modelado usadas:
+Los IDs se rellenan con ceros para preservar orden lexicográfico; el timestamp invertido ubica
+primero lo más reciente; el geohash convierte cercanía en scans por prefijo; y los contadores
+atómicos evitan agrupar millones de check-ins en cada ranking. Un mismo check-in se escribe en
+tres tablas porque cada tabla responde un acceso concreto.
 
-- **IDs con ceros a la izquierda** (`0000000147`) para que el orden lexicográfico coincida con el
-  numérico.
-- **Timestamp invertido** en la row key, para que un scan devuelva primero lo más reciente.
-- **Geohash** para convertir la búsqueda por cercanía en scans por prefijo.
-- **Contadores atómicos** (`increment`) para no recorrer todos los check-ins al armar un ranking.
-- **Escritura múltiple**: un check-in se escribe en 3 tablas, cada una ordenada para una
-  consulta.
+Los lugares sin barrio también se proyectan en `lugares` y en los índices de categoría/geohash;
+simplemente no generan una fila en `lugares_por_barrio`.
 
-Scripts NoSQL: `backend/app/persistencia/hbase/esquema.py` crea las tablas, y
-`database/hbase/cargar_desde_mysql.py` carga la proyección inicial desde MySQL.
+## 8. Justificación de HBase, ventajas y limitaciones
 
-## 8. Justificación de la utilización de NoSQL
+La parte beneficiada por NoSQL es la actividad: check-ins, historiales por usuario o lugar,
+pasaporte y rankings. Es un flujo creciente, mayormente *append*, con claves de acceso conocidas.
+HBase permite escalar horizontalmente y hacer scans de rangos contiguos sin joins.
 
-**Qué información va a HBase:** la actividad (check-ins), los índices de lectura del catálogo y
-los agregados (contadores por lugar y mes).
+Sus ventajas son las lecturas preordenadas por row key, contadores atómicos, esquema flexible y
+rendimiento estable de agregados precalculados. Sus costos son la duplicación, ausencia de FKs,
+`UNIQUE`, joins y transacciones entre filas, mayor complejidad operativa y necesidad de diseñar
+una tabla por patrón de consulta. La aplicación debe validar integridad y coordinar escrituras.
 
-**Por qué un modelo columnar como HBase:**
+Por eso MySQL conserva la verdad canónica. Una escritura de actividad se realiza primero en
+MySQL y luego se refleja en HBase. La proyección completa puede regenerarse con
+`database/hbase/cargar_desde_mysql.py`.
 
-- Los check-ins crecen sin límite y son un caso típico de *append* (se agregan, casi no se
-  modifican). HBase escala horizontalmente particionando por row key.
-- Todas las lecturas de actividad son por un prefijo conocido (usuario, lugar o mes): eso es
-  exactamente un scan por rango de row key, sin joins.
-- Los contadores atómicos permiten rankings sin `GROUP BY` sobre millones de filas.
+## 9. Arquitectura general
 
-**Ventajas frente al modelo relacional:**
-
-- Lecturas de agregados (pasaporte, ranking) que no se degradan con el volumen: con 1 millón de
-  check-ins, el pasaporte del usuario más activo tarda 27 ms en HBase contra 172 ms en MySQL
-  (ver sección 14).
-- Esquema flexible: agregar un mes nuevo al contador es agregar una columna.
-
-**Desventajas y limitaciones:**
-
-- No tiene claves foráneas, restricciones `UNIQUE`, transacciones entre filas ni joins. Todo eso
-  lo resuelve la aplicación (validaciones manuales y escrituras múltiples).
-- La desnormalización duplica datos: si cambia el nombre de un lugar, los check-ins viejos
-  conservan el nombre anterior.
-- Cada consulta nueva requiere diseñar una tabla nueva.
-- En consultas puntuales chicas (un historial corto) MySQL es más rápido, por el costo de
-  conexión de Thrift.
-- Es más pesado de operar (necesita ZooKeeper y la JVM).
-
-Por eso la solución es **híbrida**: MySQL sigue siendo la fuente de verdad y HBase es una
-proyección optimizada para lectura.
-
-## 9. Arquitectura general de la aplicación
-
-```
- Expo / React Native (iOS, Android, Web)
-            │  HTTP + JSON, token Bearer
-            ▼
- FastAPI (backend/app/api.py)
-            │  solo conoce las interfaces RepoLugares, RepoCheckins, RepoConsultas...
-            ▼
- Capa de persistencia (backend/app/persistencia)
-     ├── mysql/   implementación relacional (SQLAlchemy + PyMySQL)
-     ├── hbase/   implementación columnar (HappyBase + Thrift)
-     └── hibrida.py  coordina la escritura MySQL → HBase de la actividad
-            │                         │
-            ▼                         ▼
-      MySQL 8.4 (Docker)       HBase 2.1 (Docker)
+```text
+Expo SDK 58 / React Native / Web
+              │ HTTP JSON + Bearer token
+              ▼
+         FastAPI (Python)
+              │ repositorios abstractos
+       ┌──────┴────────┐
+       ▼               ▼
+ MySQL 8.4         HBase 2.1 + Thrift
+ fuente de verdad  proyección de actividad
 ```
 
-El frontend nunca accede a las bases: toda interacción pasa por el backend.
+La capa de presentación nunca accede a las bases directamente. FastAPI expone la API y usa
+interfaces comunes de repositorios. Docker Compose levanta MySQL, HBase, inicialización de HBase,
+backend y frontend web.
 
-## 10. Explicación del backend polimórfico
+## 10. Backend polimórfico y funcionalidades
 
-`backend/app/persistencia/base.py` define interfaces abstractas (`RepoLugares`, `RepoCheckins`,
-`RepoConsultas`, `RepoUsuarios`, `RepoCatalogo`) con operaciones como `listar()`, `obtener()`,
-`crear()`, `actualizar()`, `eliminar()`, `cercanos()`, `ranking_barrio()` y `pasaporte()`.
+`backend/app/persistencia/base.py` define las interfaces `RepoLugares`, `RepoCheckins`,
+`RepoConsultas`, `RepoUsuarios` y `RepoCatalogo`. MySQL y HBase implementan esas operaciones con
+SQL o con row keys/scans. La API depende de las interfaces y la fábrica decide la implementación.
 
-Cada motor las implementa a su manera:
+En **modo automático**, MySQL resuelve cuentas, catálogo y transacciones; HBase resuelve
+historiales, pasaporte y rankings. En **modo demostración**, el header `X-Motor: mysql|hbase`
+permite ejecutar las lecturas que cuentan con ambas implementaciones y comparar sus metadatos.
+No es una elección funcional del usuario: la aplicación decide la base apropiada. Autenticación,
+favoritos y sugerencias son exclusivamente relacionales y no obedecen al selector. Las escrituras
+siempre son canónicas en MySQL y, cuando corresponde, se proyectan a HBase.
 
-| Operación | MySQL | HBase |
-|---|---|---|
-| `lugares.listar(barrio)` | `SELECT ... WHERE id_barrio = ? ORDER BY ...` | scan de `lugares_por_barrio` con prefijo `<idBarrio>#` + multi-get |
-| `lugares.cercanos()` | filtro por *bounding box* + distancia | scan de las celdas geohash vecinas |
-| `consultas.ranking_barrio()` | `COUNT(*) ... GROUP BY ... RANK()` | lectura de contadores `stats_lugar` |
-| `consultas.pasaporte()` | joins + `GROUP BY barrio` | scan de `checkins_por_usuario` |
+Se implementó CRUD de lugares para administradores y CRUD de check-ins para su autor o un
+administrador. También hay login/logout, roles, favoritos, sugerencias moderadas, búsqueda y
+filtros, cercanía, pasaporte y ranking mensual. Cada respuesta informa motor, operaciones y
+duración en `meta`, visibles en la barra de diagnóstico de la app.
 
-La fábrica (`persistencia/fabrica.py`) construye el conjunto de repositorios de un motor. La API
-recibe ese conjunto por inyección de dependencias y no sabe qué tecnología hay detrás.
-
-**Selección del motor:**
-
-- **Modo automático (por defecto):** el backend asigna cada responsabilidad al motor más
-  adecuado. MySQL resuelve el catálogo, las cuentas y todas las escrituras; HBase resuelve los
-  historiales, el pasaporte y los rankings. Configurable con la variable de entorno
-  `ACTIVIDAD_DB`.
-- **Modo demostración:** con el header HTTP `X-Motor: mysql` o `X-Motor: hbase` (en la app:
-  *Perfil → Motor de base de datos*), **la misma lectura** se ejecuta con la implementación del
-  motor elegido. Las escrituras ignoran el selector: siempre van a MySQL y se replican a HBase,
-  para que las dos bases no se desincronicen.
-- Cada respuesta incluye `meta.motor`, la duración y las operaciones ejecutadas. La app las
-  muestra en el badge del encabezado y en la barra de diagnóstico.
-
-**CRUD implementado:** lugares (alta, consulta individual, listado, modificación y baja lógica, solo
-admin) y check-ins (alta, consulta, modificación y baja, por su autor).
-
-**Consultas complejas:** pasaporte del usuario (barrios visitados y faltantes, con progreso),
-ranking mensual por barrio (con empates tipo `RANK()`) y lugares cercanos por radio.
-
-## 11. Tecnologías utilizadas
+## 11. Tecnologías y organización
 
 | Capa | Tecnología |
 |---|---|
 | Base relacional | MySQL 8.4 |
-| Base NoSQL | Apache HBase 2.1 (imagen `harisekhon/hbase`), acceso por Thrift |
-| Backend | Python 3.11+, FastAPI, SQLAlchemy, PyMySQL, HappyBase, Pydantic |
-| Frontend | Expo SDK 58, React Native, Expo Router, TypeScript (móvil y web) |
-| Infraestructura | Docker Compose |
-| Control de versiones | Git + GitHub (ramas por funcionalidad y pull requests) |
-| Gestión de tareas | <!-- TODO: GitHub Projects / Trello / Notion... --> |
+| Base NoSQL | Apache HBase 2.1, Thrift y HappyBase |
+| Backend | Python 3.11+, FastAPI, SQLAlchemy, PyMySQL y Pydantic |
+| Frontend | Expo SDK 58, React Native, Expo Router y TypeScript |
+| Infraestructura | Docker Compose y nginx para la versión web |
+| Versionado | Git y GitHub, ramas por funcionalidad y merges a `main` |
+| Gestión | Backlog y decisiones en README/documentación; coordinación por ramas y commits |
 
-## 12. Instrucciones para ejecutar el proyecto
+No se usó una herramienta externa de gestión de tareas. Esta decisión simplificó un grupo y un
+alcance pequeños, aunque para una segunda etapa convendría usar GitHub Projects con responsables
+y criterios de aceptación.
 
-Ver `README.md` en la raíz del repositorio. Resumen: `docker compose up -d`, crear el esquema y
-cargar los datos iniciales, cargar la proyección en HBase, levantar el backend con `uvicorn` y la
-app con `npx expo start` (o `npx expo start --web` para la versión de escritorio).
+## 12. Ejecución reproducible
+
+La forma recomendada requiere Git y Docker Desktop. Desde la raíz:
+
+```powershell
+docker compose up -d --build
+docker compose ps
+```
+
+La aplicación web queda en <http://localhost:8081>, la documentación de la API en
+<http://localhost:8000/docs> y la UI de HBase en <http://localhost:16010>. MySQL crea esquema y
+datos iniciales al crear el volumen; `hbase-init` reconstruye la proyección antes de iniciar el
+backend. Las instrucciones de desarrollo con Python, Node y Expo Go están detalladas en
+`README.md`.
 
 ## 13. Ejemplos de funcionamiento
 
-<!-- TODO: capturas de pantalla. Sugerencia de capturas (en la versión web):
-1. Login.
-2. Inicio con el desafío del pasaporte y el listado de lugares.
-3. Filtro por barrio y búsqueda por nombre.
-4. Detalle de un lugar y alta de un check-in.
-5. Edición y borrado del check-in.
-6. Mi pasaporte con los sellos por barrio.
-7. Ranking mensual de un barrio.
-8. Cercanos con el mapa.
-9. Admin: alta, edición y baja de un lugar; moderación de sugerencias.
-10. Perfil → Motor: la misma pantalla resuelta con MySQL y con HBase, mostrando la barra de
-    diagnóstico con las operaciones y los milisegundos. -->
+1. El usuario inicia sesión y recibe un token revocable.
+2. Busca “museo”, filtra por barrio/categoría y abre el detalle de un lugar.
+3. Guarda el lugar como favorito y registra un check-in con puntaje y comentario. Como todavía
+   no se adjunta foto, queda `verificado = false`.
+4. El pasaporte consulta barrios visitados y calcula el progreso; el ranking muestra los lugares
+   más visitados de un barrio durante un mes.
+5. Un usuario propone un lugar. Un administrador lo aprueba; recién entonces se crea el lugar y
+   se proyecta a HBase.
+6. Un administrador crea, modifica o da de baja un lugar. El usuario común recibe un error 403.
+7. En Ajustes se fuerza MySQL o HBase para repetir una lectura comparable; la app muestra el
+   motor y los tiempos devueltos por la API.
 
-## 14. Comparación entre ambas implementaciones
+La API interactiva permite reproducir estos flujos y ver los esquemas de entrada/salida en
+`/docs`. Las cuentas locales de demostración son `admin / Admin123!` y
+`visitante / Usuario123!`.
 
-Medición con `backend/dev/comparar_motores.py`: 30 repeticiones por caso y la **mediana** en ms.
-Las dos implementaciones devuelven resultados equivalentes en todos los casos. Escenario con
-**1.000.001 check-ins** simulados:
+## 14. Comparación MySQL–HBase
 
-| Consulta | Caso | MySQL (ms) | HBase (ms) |
+`backend/dev/comparar_motores.py` ejecuta 30 repeticiones, compara resultados y registra mediana,
+p95 y mínimo. La actividad sintética es reproducible con semilla fija. En el escenario de
+1.000.001 check-ins, todas las filas reportaron `equivalentes=True`.
+
+| Consulta | Caso | MySQL mediana (ms) | HBase mediana (ms) |
 |---|---|---:|---:|
-| Historial por usuario | más activo (1.303 check-ins) | 3,6 | 8,3 |
-| Actividad por lugar | más activo (59.899 check-ins) | 3,8 | 8,3 |
-| Ranking mensual | barrio más activo (13.463 check-ins) | 24,0 | 14,0 |
+| Historial por usuario | más activo, 1.303 check-ins | 3,6 | 8,3 |
+| Actividad por lugar | más activo, 59.899 check-ins | 3,8 | 8,3 |
+| Ranking mensual | barrio más activo, 13.463 check-ins | 24,0 | 14,0 |
 | Ranking mensual | barrio mediano | 6,9 | 9,1 |
-| Pasaporte del usuario | más activo | 172,2 | 27,1 |
-| Pasaporte del usuario | mediano | 9,9 | 10,0 |
+| Pasaporte | usuario más activo | 172,2 | 27,1 |
+| Pasaporte | usuario mediano | 9,9 | 10,0 |
 
-Datos completos para 10.000, 100.000 y 1.000.000 de check-ins en
-`backend/dev/resultados/benchmark.csv`.
+Los resultados completos para aproximadamente 10.000, 100.000 y 1.000.000 de check-ins están en
+`backend/dev/resultados/benchmark.csv`. MySQL gana en lecturas puntuales y paginadas gracias a sus
+índices y al menor costo de conexión. HBase gana cuando el volumen hace costosos los agrupamientos
+y puede aprovechar contadores o scans preordenados. No existe un ganador universal: depende del
+patrón de acceso y del volumen.
 
-**Conclusión de la comparación:** en lecturas puntuales y paginadas MySQL gana, porque sus
-índices compuestos resuelven el caso y HBase paga el costo de Thrift. En las consultas de
-**agregación sobre mucho volumen** (pasaporte del usuario muy activo, ranking del barrio con más
-actividad), HBase gana con claridad gracias a los contadores precalculados y a los scans por
-prefijo. Y su ventaja crece con el volumen.
+## 15. Problemas encontrados y decisiones
 
-<!-- TODO (opcional): agregar un gráfico de mediana vs. volumen para pasaporte y ranking. -->
-
-## 15. Problemas encontrados y decisiones tomadas
-
-| Problema | Decisión |
+| Problema | Decisión aplicada |
 |---|---|
-| Dos codificaciones distintas de "Núñez" | Se consolidan en un único barrio en el ETL. |
-| Categorías que solo difieren en acentos ("OLEO S/TELA" / "ÖLEO S/TELA") rompían la carga en una base nueva | El ETL las consolida usando la misma regla que la collation de MySQL. Quedan 228 categorías. |
-| 10 lugares sin nombre | Se omiten; no se inventan valores. |
-| 270 lugares sin barrio | Se cargan con `id_barrio = NULL`; no admiten check-in hasta que se valide el barrio. |
-| Coordenadas incompletas | Se guardan como `NULL`. |
-| HBase no tiene FKs, `UNIQUE` ni transacciones | Validación en la aplicación, escrituras múltiples y MySQL como fuente de verdad. |
-| Mantener sincronizadas las dos bases | Escritura canónica en MySQL y replicación inmediata a HBase. Si HBase falla, se puede reconstruir la proyección con `cargar_desde_mysql.py`. |
-| Mostrar el polimorfismo sin desincronizar los datos | Selector de motor solo para lecturas (header `X-Motor`). |
-| `react-native-maps` no funciona en web | Componente de mapa separado por plataforma; en web se usa un mapa de OpenStreetMap. |
-| Nombres en mayúsculas y sin tildes en el dataset | Por ahora la app los muestra en formato título. **TODO:** normalizarlos en el ETL. |
-| <!-- TODO: agregar otros problemas que haya tenido el grupo --> | |
+| Núñez con dos codificaciones | consolidación en el ETL |
+| Categorías equivalentes por acentos | comparación normalizada compatible con la collation |
+| Diez lugares sin nombre | descarte explícito, sin inventar nombres |
+| 270 lugares sin barrio | FK nula; HBase los conserva fuera del índice por barrio |
+| Coordenadas incompletas | par de coordenadas nulo |
+| HBase sin integridad relacional | validación de aplicación y MySQL como fuente canónica |
+| Duplicación NoSQL | proyección reconstruible desde MySQL |
+| Riesgo de desincronización | escritura MySQL primero y proyección inmediata; recarga completa disponible |
+| Comparar motores sin duplicar API | interfaces comunes, selector solo para lecturas equivalentes y metadatos |
+| Mapas nativos no disponibles en web | componente por plataforma y OpenStreetMap en web |
+| Nombres de origen en mayúsculas o sin tildes | presentación en formato título; se preserva el dato trazable |
+| Falta de fecha histórica de descarga | se declara la ausencia y la fecha de consulta, sin inventar metadatos |
 
 ## 16. Conclusiones
 
-<!-- TODO: redactarlas en grupo. Ideas:
-- La normalización hizo visible y evitó anomalías reales del dataset (Núñez, OLEO/ÖLEO).
-- No hay un motor "mejor": cada uno rinde en un tipo de acceso distinto (ver sección 14).
-- Separar la lógica de la persistencia permitió cambiar de motor sin tocar la API ni la app.
-- El costo de NoSQL: la integridad que en MySQL da el motor, en HBase la tiene que garantizar el
-  código.
-- Qué harían distinto o qué agregarían (fotos de los lugares, parte social, verificación del
-  check-in por GPS...). -->
+La normalización permitió convertir cuatro fuentes heterogéneas en un modelo coherente y evitar
+anomalías reales de actualización. Las restricciones de MySQL resultan esenciales para usuarios,
+roles, moderación y trazabilidad. HBase no se eligió para reemplazarlo, sino para una parte concreta
+que crece y tiene accesos repetitivos por usuario, lugar y mes.
+
+La comparación confirma que la tecnología adecuada depende del caso: MySQL es superior para
+transacciones y lecturas pequeñas; HBase muestra ventaja en agregaciones de gran volumen
+preparadas por su modelo. Separar la API de la persistencia permitió implementar y medir ambos
+motores sin duplicar la lógica funcional.
+
+La principal contrapartida de NoSQL es trasladar al código responsabilidades que el motor
+relacional resuelve con FKs y transacciones. Como evolución quedan la verificación del check-in
+mediante foto y ubicación, amistades/feed, insignias, rutas y despliegue público; esas funciones no
+forman parte de la entrega actual y no alteran el modelo base.
+
+## 17. Correspondencia con las consignas
+
+| Consigna | Evidencia en el proyecto |
+|---|---|
+| Problema y alcance | secciones 1 y 10; frontend y API funcionales |
+| Dataset, origen y análisis | secciones 2 y 3; `database/datasets/` |
+| Normalización hasta 3FN | sección 4; ETL reproducible |
+| DER y cardinalidades | sección 5; `documentacion/DER.md` |
+| Modelo relacional, claves y restricciones | sección 6; `modelo_relacional.sql` |
+| CRUD | lugares y check-ins en sección 10 y endpoints FastAPI |
+| Consultas no triviales | cercanos, pasaporte y ranking mensual |
+| Parte beneficiada por NoSQL | secciones 7 y 8; actividad e índices HBase |
+| Ventajas y limitaciones NoSQL | sección 8 |
+| Dos implementaciones comparables | interfaces de persistencia y `X-Motor` |
+| Comparación experimental | sección 14; script y CSV de resultados |
+| Aplicación, arquitectura y tecnologías | secciones 9 a 13; Docker Compose |
+| Problemas y conclusiones | secciones 15 y 16 |
+
+## Referencias
+
+- Gobierno de la Ciudad de Buenos Aires, portal BA Data: <https://data.buenosaires.gob.ar>.
+- Apache HBase Reference Guide: <https://hbase.apache.org/book.html>.
+- MySQL 8.4 Reference Manual: <https://dev.mysql.com/doc/refman/8.4/en/>.
+- FastAPI Documentation: <https://fastapi.tiangolo.com/>.

@@ -17,16 +17,15 @@ class ProyectorHBase:
         return happybase.Connection(settings.hbase_host, settings.hbase_port)
 
     def sincronizar_lugar(self, lugar: Lugar) -> None:
-        if lugar.barrio is None:
-            return
         try:
             with self.traza.medir(f"HBASE PROJECT lugar {lugar.id}"):
                 con = self._conexion()
                 principal = con.table("lugares")
                 anterior = de_celdas(principal.row(clave(lugar.id)))
                 if anterior:
-                    con.table("lugares_por_barrio").delete(
-                        clave(int(anterior["id_barrio"]), lugar.id))
+                    if "id_barrio" in anterior:
+                        con.table("lugares_por_barrio").delete(
+                            clave(int(anterior["id_barrio"]), lugar.id))
                     con.table("lugares_por_categoria").delete(
                         clave(int(anterior["id_categoria"]), lugar.id))
                     if anterior.get("geohash"):
@@ -35,21 +34,40 @@ class ProyectorHBase:
                 gh = None
                 if lugar.latitud is not None and lugar.longitud is not None:
                     gh = geohash.codificar(lugar.latitud, lugar.longitud, 6)
+                columnas_vacias = [
+                    f"d:{columna}".encode()
+                    for columna, vacia in (
+                        ("direccion", lugar.direccion is None),
+                        ("lat", lugar.latitud is None or lugar.longitud is None),
+                        ("lon", lugar.latitud is None or lugar.longitud is None),
+                        ("geohash", gh is None),
+                        ("id_barrio", lugar.barrio is None),
+                        ("barrio", lugar.barrio is None),
+                        ("comuna", lugar.barrio is None),
+                    )
+                    if vacia and columna in anterior
+                ]
+                if columnas_vacias:
+                    principal.delete(clave(lugar.id), columns=columnas_vacias)
                 principal.put(clave(lugar.id), a_celdas({
                     "nombre": lugar.nombre, "direccion": lugar.direccion,
                     "lat": lugar.latitud, "lon": lugar.longitud, "geohash": gh,
                     "id_categoria": lugar.categoria.id, "categoria": lugar.categoria.nombre,
-                    "tipo": lugar.categoria.tipo, "id_barrio": lugar.barrio.id,
-                    "barrio": lugar.barrio.nombre, "comuna": lugar.barrio.comuna,
+                    "tipo": lugar.categoria.tipo,
+                    "id_barrio": lugar.barrio.id if lugar.barrio else None,
+                    "barrio": lugar.barrio.nombre if lugar.barrio else None,
+                    "comuna": lugar.barrio.comuna if lugar.barrio else None,
                     "fuente": lugar.fuente,
                 }))
-                con.table("lugares_por_barrio").put(
-                    clave(lugar.barrio.id, lugar.id),
-                    a_celdas({"nombre": lugar.nombre.lower(), "id_categoria": lugar.categoria.id}),
-                )
+                if lugar.barrio:
+                    con.table("lugares_por_barrio").put(
+                        clave(lugar.barrio.id, lugar.id),
+                        a_celdas({"nombre": lugar.nombre.lower(), "id_categoria": lugar.categoria.id}),
+                    )
                 con.table("lugares_por_categoria").put(
                     clave(lugar.categoria.id, lugar.id),
-                    a_celdas({"nombre": lugar.nombre.lower(), "id_barrio": lugar.barrio.id}),
+                    a_celdas({"nombre": lugar.nombre.lower(),
+                              "id_barrio": lugar.barrio.id if lugar.barrio else None}),
                 )
                 if gh:
                     con.table("lugares_por_geohash").put(
@@ -67,7 +85,9 @@ class ProyectorHBase:
                 principal = con.table("lugares")
                 anterior = de_celdas(principal.row(clave(id_lugar)))
                 if anterior:
-                    con.table("lugares_por_barrio").delete(clave(int(anterior["id_barrio"]), id_lugar))
+                    if "id_barrio" in anterior:
+                        con.table("lugares_por_barrio").delete(
+                            clave(int(anterior["id_barrio"]), id_lugar))
                     con.table("lugares_por_categoria").delete(clave(int(anterior["id_categoria"]), id_lugar))
                     if anterior.get("geohash"):
                         con.table("lugares_por_geohash").delete(

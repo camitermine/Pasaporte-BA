@@ -119,6 +119,7 @@ CREATE TABLE sugerencia_lugar (
     motivo_revision VARCHAR(500) NULL,
     id_lugar_creado INT UNSIGNED NULL,
     INDEX idx_sugerencia_estado_fecha (estado, fecha_alta),
+    UNIQUE (id_lugar_creado),
     FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario) ON DELETE RESTRICT,
     FOREIGN KEY (id_revisor) REFERENCES usuario (id_usuario) ON DELETE RESTRICT,
     FOREIGN KEY (id_categoria) REFERENCES categoria (id_categoria),

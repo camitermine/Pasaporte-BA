@@ -39,7 +39,7 @@ def cargar() -> None:
             FROM categoria c JOIN tipo_lugar t ON t.id_tipo=c.id_tipo""")
         lugares = filas(sql, """SELECT l.*, b.nombre AS barrio, b.id_comuna,
                    c.nombre AS categoria, t.nombre AS tipo, f.nombre AS fuente
-            FROM lugar l JOIN barrio b ON b.id_barrio=l.id_barrio
+            FROM lugar l LEFT JOIN barrio b ON b.id_barrio=l.id_barrio
             JOIN categoria c ON c.id_categoria=l.id_categoria
             JOIN tipo_lugar t ON t.id_tipo=c.id_tipo
             LEFT JOIN fuente f ON f.id_fuente=l.id_fuente WHERE l.activo=TRUE""")
@@ -69,8 +69,10 @@ def cargar() -> None:
                 "categoria": l["categoria"], "tipo": l["tipo"], "id_barrio": l["id_barrio"],
                 "barrio": l["barrio"], "comuna": l["id_comuna"], "fuente": l["fuente"],
             }))
-            por_barrio.put(clave(l["id_barrio"], l["id_lugar"]),
-                           a_celdas({"nombre": l["nombre"].lower(), "id_categoria": l["id_categoria"]}))
+            if l["id_barrio"] is not None:
+                por_barrio.put(clave(l["id_barrio"], l["id_lugar"]),
+                               a_celdas({"nombre": l["nombre"].lower(),
+                                         "id_categoria": l["id_categoria"]}))
             por_categoria.put(clave(l["id_categoria"], l["id_lugar"]),
                               a_celdas({"nombre": l["nombre"].lower(), "id_barrio": l["id_barrio"]}))
             if gh:

@@ -118,6 +118,7 @@ class Pagina(BaseModel, Generic[T]):
 class FiltroLugares(BaseModel):
     id_barrio: int | None = None
     id_categoria: int | None = None
+    tipo: str | None = None
     q: str | None = None
 
 

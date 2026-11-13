@@ -31,7 +31,7 @@ services:
     ports:
       - "16010:16010" # UI web del Master
       - "9090:9090"   # Thrift (lo usa el backend con happybase)
-      - "8080:8080"   # REST (opcional)
+      - "8082:8080"   # REST (opcional; 8080 puede estar ocupado por servicios Java locales)
     volumes:
       - hbase_data:/hbase-data
 

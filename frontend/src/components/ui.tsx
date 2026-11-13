@@ -43,8 +43,9 @@ export const estiloTipo: Record<string, { color: string; fondo: string; icono: I
   'arte urbano': { color: '#E35D4A', fondo: '#FCE8E4', icono: 'brush', etiqueta: 'Arte urbano' },
   gastronomia: { color: '#286B4E', fondo: '#E3EFE8', icono: 'cafe', etiqueta: 'Gastronomía' },
 };
+const claveTipo = (tipo: string) => tipo.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 export const tipoDe = (tipo: string) =>
-  estiloTipo[tipo] ?? { color: colores.suave, fondo: colores.primarioClaro, icono: 'location' as Icono, etiqueta: tipo };
+  estiloTipo[claveTipo(tipo)] ?? { color: colores.suave, fondo: colores.primarioClaro, icono: 'location' as Icono, etiqueta: tipo };
 
 export const colorMotor = (motor: string) => (motor === 'hbase' ? colores.hbase : colores.mysql);
 

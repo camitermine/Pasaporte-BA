@@ -41,13 +41,15 @@ de origen. Los CSV originales se conservan sin modificaciones. Durante la limpie
 - Conserva 270 lugares sin barrio con `id_barrio = NULL`.
 - Convierte coordenadas incompletas a `NULL`.
 - Corrige texto mal codificado cuando es recuperable.
+- Normaliza barrios, nombres y calles: recupera tildes y caracteres dañados, aplica formato
+  título sin alterar siglas y consolida variantes de una misma calle.
 - Usa los tipos de origen como categorías agrupadas en cultura, patrimonio, arte urbano o
   gastronomía.
 
 Los datos provienen del portal de datos abiertos de la Ciudad
 (<https://data.buenosaires.gob.ar>, categoría *Cultura y turismo*): espacios culturales,
-monumentos, murales y oferta gastronómica. Falta registrar la URL exacta, la fecha de descarga y
-la licencia de cada dataset (ver `documentacion/informe.md`, sección 2).
+monumentos, murales y oferta gastronómica. Las URL oficiales, la licencia CC BY 2.5 AR y la
+aclaración sobre la fecha histórica de descarga están documentadas en la sección 2 del informe.
 
 ## Documentación
 

@@ -3,7 +3,7 @@
 **Materia:** Bases de Datos — Tecnicatura en Programación Informática (UNSAM)
 **Docentes:** Gabriel Flores y Rodrigo Casco
 **Integrantes:** completar con los nombres y apellidos de los cinco integrantes
-**Fecha de entrega:** noviembre de 2026
+**Fecha de entrega:** 13 de noviembre de 2026
 **Repositorio:** <https://github.com/camitermine/Pasaporte-BA>
 
 ## 1. Descripción del problema
@@ -77,7 +77,10 @@ y tipo en cada lugar produciría anomalías de actualización e inconsistencias.
 Las decisiones de limpieza fueron conservadoras: se descartaron solamente los diez registros sin
 nombre; los 270 lugares sin barrio se conservaron con FK nula; las coordenadas incompletas se
 convirtieron en nulas; se reparó texto cuando era inequívoco y se consolidaron duplicados de
-codificación. No se inventaron valores ausentes.
+codificación. Además, el ETL normaliza barrios con su denominación oficial, aplica formato título
+sin alterar siglas ni números romanos, corrige tildes y errores de tipeo revisados, y unifica las
+variantes de escritura de las calles. No se inventaron valores ausentes ni se modificaron los dos
+signos `?` que forman parte de nombres comerciales.
 
 ## 4. Evolución hasta tercera forma normal
 
@@ -314,7 +317,12 @@ patrón de acceso y del volumen.
 | Riesgo de desincronización | escritura MySQL primero y proyección inmediata; recarga completa disponible |
 | Comparar motores sin duplicar API | interfaces comunes, selector solo para lecturas equivalentes y metadatos |
 | Mapas nativos no disponibles en web | componente por plataforma y OpenStreetMap en web |
-| Nombres de origen en mayúsculas o sin tildes | presentación en formato título; se preserva el dato trazable |
+| Nombres en mayúsculas y barrios sin tildes | el ETL usa nombres oficiales (`Agronomía`, `Constitución`, `La Boca`) y formato título, preservando siglas y números romanos |
+| Tildes y errores de tipeo | 768 palabras revisadas y 58 correcciones explícitas; los casos ambiguos o comerciales se conservan |
+| Calles con orden y abreviaturas diferentes | 1.249 formas de origen se consolidan en 1.009 nombres; se normalizan títulos, avenidas y orden nombre/apellido |
+| Texto con *mojibake* | reparación iterativa de latin-1/cp1252 y siete correcciones por identificador para casos irrecuperables |
+| 50 nombres con `?` por pérdida de caracteres | se corrigen 48 mediante 34 reglas revisadas y se preservan `Como? El 12` y `Pizza Que?` |
+| Signos y abreviaturas inconsistentes | se unifican ordinales, apóstrofos, comillas y espacios después de abreviaturas |
 | Falta de fecha histórica de descarga | se declara la ausencia y la fecha de consulta, sin inventar metadatos |
 
 ## 16. Conclusiones

@@ -41,6 +41,8 @@ de origen. Los CSV originales se conservan sin modificaciones. Durante la limpie
 - Conserva 270 lugares sin barrio con `id_barrio = NULL`.
 - Convierte coordenadas incompletas a `NULL`.
 - Corrige texto mal codificado cuando es recuperable.
+- Normaliza barrios, nombres y calles: recupera tildes y caracteres dañados, aplica formato
+  título sin alterar siglas y consolida variantes de una misma calle.
 - Usa los tipos de origen como categorías agrupadas en cultura, patrimonio, arte urbano o
   gastronomía.
 

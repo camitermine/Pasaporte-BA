@@ -307,7 +307,7 @@ def portada(canvas, doc):
     canvas.drawString(24 * mm, h - 134 * mm, "Tecnicatura en Programación Informática — UNSAM")
     canvas.drawString(24 * mm, h - 142 * mm, "Docentes: Gabriel Flores y Rodrigo Casco")
     canvas.drawString(24 * mm, h - 150 * mm, "Integrantes: completar con los cinco nombres")
-    canvas.drawString(24 * mm, h - 158 * mm, "Noviembre de 2026")
+    canvas.drawString(24 * mm, h - 158 * mm, "13 de noviembre de 2026")
     etiquetas = [("MYSQL 8.4", TEAL), ("HBASE 2.1", GOLD), ("FASTAPI", NAVY), ("EXPO 58", TEAL)]
     x = 24 * mm
     for texto, color in etiquetas:

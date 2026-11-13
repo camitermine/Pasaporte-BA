@@ -4,7 +4,7 @@
 |---|---|---|
 | `informe.md` | Informe completo y correspondencia con las consignas | Listo; falta reemplazar los nombres de integrantes |
 | `DER.md` | DER en Mermaid y explicación de cardinalidades | Listo |
-| `informe.pdf` | Versión final para entregar | Se genera desde `informe.md` |
+| `../output/pdf/informe_pasaporte_ba.pdf` | Versión final para entregar | Se genera desde `informe.md` |
 | `../backend/dev/resultados/benchmark.csv` | Resultados reproducibles MySQL–HBase | Listo |
 
 Antes de entregar, reemplazar en `informe.md` la línea de integrantes con los cinco nombres y
@@ -15,6 +15,8 @@ el informe lo declara expresamente y registra la fecha de consulta de las fichas
 
 - Modelo relacional: `database/mysql/modelo_relacional.sql`.
 - Datos iniciales: `database/mysql/datos_iniciales.sql`.
+- Reglas de limpieza textual: `database/etl/correcciones_texto.py`.
+- ETL reproducible: `database/etl/generar_datos_mysql.py`.
 - Modelo HBase: `backend/app/persistencia/hbase/esquema.py`.
 - Proyección MySQL → HBase: `database/hbase/cargar_desde_mysql.py`.
 - Comparación: `backend/dev/comparar_motores.py` y `backend/dev/resultados/benchmark.csv`.

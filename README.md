@@ -48,12 +48,12 @@ de origen. Los CSV originales se conservan sin modificaciones. Durante la limpie
 
 Los datos provienen del portal de datos abiertos de la Ciudad
 (<https://data.buenosaires.gob.ar>, categoría *Cultura y turismo*): espacios culturales,
-monumentos, murales y oferta gastronómica. Las URL oficiales, la licencia CC BY 2.5 AR y la
-aclaración sobre la fecha histórica de descarga están documentadas en la sección 2 del informe.
+monumentos, murales y oferta gastronómica.
 
-## Documentación
+## Entrega
 
-El informe, el DER y la guía de pendientes están en `documentacion/`.
+- [Informe final en PDF](output/pdf/informe_pasaporte_ba.pdf).
+- [Diagrama Entidad-Relación](documentacion/DER.md).
 
 ## Puesta en marcha con Docker (recomendada para probar)
 

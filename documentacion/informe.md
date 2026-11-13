@@ -82,7 +82,7 @@ Problemas encontrados al analizar los datos:
 | Lugares sin barrio | 270 filas | No se puede saber a qué barrio pertenecen. |
 | Coordenadas incompletas | latitud sin longitud (1 caso) | Ubicación inválida. |
 | Dirección partida en 3 columnas | `calle`, `calle_interseccion`, `altura` | Se combinan en un único campo `direccion`. |
-| Nombres en mayúsculas y sin tildes | "AGRONOMIA", "CONSTITUCION" | Problema de presentación (pendiente, ver sección 15). |
+| Nombres en mayúsculas y sin tildes | "AGRONOMIA", "CONSTITUCION" | Problema de presentación (resuelto en el ETL, ver sección 15). |
 | Sin metadatos de origen | sin URL, fecha ni licencia | No se puede rastrear la procedencia. |
 
 ## 4. Proceso de normalización
@@ -361,7 +361,16 @@ prefijo. Y su ventaja crece con el volumen.
 | Mantener sincronizadas las dos bases | Escritura canónica en MySQL y replicación inmediata a HBase. Si HBase falla, se puede reconstruir la proyección con `cargar_desde_mysql.py`. |
 | Mostrar el polimorfismo sin desincronizar los datos | Selector de motor solo para lecturas (header `X-Motor`). |
 | `react-native-maps` no funciona en web | Componente de mapa separado por plataforma; en web se usa un mapa de OpenStreetMap. |
-| Nombres en mayúsculas y sin tildes en el dataset | Por ahora la app los muestra en formato título. **TODO:** normalizarlos en el ETL. |
+| Nombres en mayúsculas y sin tildes en el dataset | El ETL los corrige antes de cargarlos. Los barrios toman su nombre oficial con tildes ("Agronomía", "Constitución", "La Boca"). Los lugares y las categorías pasan a formato título ("Parque de los Patricios"), pero las siglas y los números romanos quedan en mayúscula ("Biblioteca - UBA", "C.G.T.", "Pio IX"). |
+| Faltan tildes en nombres de lugares, calles y categorías ("LIBRERIA", "CORDOBA", "MASTIL") | Se revisaron a mano todas las palabras del dataset y se armó una lista de unas 770 palabras que siempre llevan tilde ("Librería", "Córdoba", "Mástil", "José", "Martín"). Además, toda palabra terminada en "-cion" o "-sion" pasa a "-ción" o "-sión". Las palabras que pueden llevar tilde o no según el significado ("papa", "mas", "como") y los nombres extranjeros se dejan como vienen. |
+| Errores de tipeo ("BIBLOTECA", "LLAVALLE", "SAN MARTINN", "CONFINTERIA") | Se corrigen con una lista de 58 errores encontrados comparando las palabras raras con las frecuentes del mismo dataset. Los nombres de comercios que parecen mal escritos pero pueden ser a propósito ("Sugary Cofee", "La Moderma") no se tocan. |
+| Un reemplazo automático mal hecho en el origen convirtió en "PEÑA" cualquier "PE" seguido de dos letras y una "A" | Se detectó por palabras imposibles como "PEÑADOR" o "AGROPEÑARIA". Se recuperan "Pescador", "Agropecuaria", "Campeonato", "Despertar", "Perlasca" (Giorgio Perlasca) y "Pedraza" (calle Manuela Pedraza). Los "Peña" correctos ("Sáenz Peña", "Peña La Baguala") no se modifican. |
+| La misma calle escrita de muchas formas ("SALGUERO, JERONIMO", "SALGUERO. JERONIMO", "SALGUERO JERONIMO", "JERONIMO SALGUERO") | El ETL arma la dirección en el orden en que se lee: "Jerónimo Salguero 1234", "Av. Pres. Figueroa Alcorta 3000", "Dr. Ricardo Balbín y Av. Cabildo". Si la calle aparece con coma en algún registro se usa ese orden; si no, se usa la lista de nombres de pila que surge de las propias calles para darla vuelta ("ZANNI PEDRO COMODORO" → "Comodoro Pedro Zanni"). Las 1.259 formas distintas quedan en 1.010 calles. Solo se agrega "Av." cuando la fuente lo indica, salvo calles que empiezan con "de"/"del" y existen como avenida ("De Mayo" → "Av. de Mayo"). |
+| Algunas "ñ" y "ü" seguían rotas ("DOÃ‘A FLOR") | La limpieza de codificación ahora prueba también la codificación de Windows (cp1252). Se recuperan 79 lugares, como "Doña Flor" y "El Pingüino". |
+| Letras convertidas en otro carácter por una codificación de DOS (cp437) | Se reemplazan siempre por el carácter correcto: "B SICO" → "Básico", "Gauchito 2§" → "Gauchito 2º", "Gìeme" → "Güemes", "Ìlkìmen" → "Ülkümen". |
+| 47 lugares con un "?" en lugar de una letra ("SAENZ PE?A", "N?UTICA") | La letra se perdió antes de que llegaran los datos. Se corrigen con una lista de 34 palabras revisadas a mano ("Peña", "Náutica", "Secretaría", "Técnica"). Los "?" que son parte del nombre ("Pizza Que?") se conservan. |
+| 7 nombres con caracteres irrecuperables o errores de tipeo | Se corrigen a mano por id de lugar: "La Cigüeña", "Maria Fulô", "Otto Görguell", "Tres Niños" (decía "NIÑIOS"), "Plaza del Carmen", "Trompe l'Oeil" y "Güemes". En "Maria Fulô" y "Otto Görguell" la letra se dedujo del patrón de la codificación rota y no se pudo confirmar con otra fuente. |
+| Signos escritos de distintas formas | Se unifican: "N°" y "Nº" pasan a "Nº" (ordinal), "´" pasa a apóstrofo ("Teatro Andamio '90"), las comillas tipográficas “ ” pasan a comillas rectas y se agrega el espacio que faltaba después de abreviaturas ("HJE.A" → "Hje. a"). |
 | <!-- TODO: agregar otros problemas que haya tenido el grupo --> | |
 
 ## 16. Conclusiones

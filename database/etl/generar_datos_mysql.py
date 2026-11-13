@@ -17,6 +17,26 @@ import unicodedata
 from collections import Counter
 from pathlib import Path
 
+from correcciones_texto import (
+    ABREVIATURAS_DE_CALLE,
+    APELLIDOS_CON_ARTICULO,
+    CALLES_CORREGIDAS,
+    CARACTERES_CORREGIDOS,
+    CONECTORES,
+    ERRORES_DE_TIPEO,
+    FRASES_CORREGIDAS,
+    NOMBRES_CORREGIDOS_POR_LUGAR,
+    NOMBRES_DE_PILA_ADICIONALES,
+    NOMBRES_OFICIALES_BARRIO,
+    PALABRAS_CON_LETRA_PERDIDA,
+    PALABRAS_CON_TILDE,
+    PARTICULAS_DE_NOMBRE,
+    PREPOSICIONES_TRAS_AVENIDA,
+    PRIMERAS_PALABRAS_DE_CALLE,
+    SIGLAS,
+    TITULOS_DE_CALLE,
+)
+
 RAIZ = Path(__file__).resolve().parents[2]
 ORIGEN = RAIZ / "database" / "datasets" / "tablas_3fn"
 SALIDA = RAIZ / "database" / "mysql" / "datos_iniciales.sql"
@@ -29,6 +49,27 @@ TIPOS_APP = {
     "4": (4, "gastronomía"),
 }
 
+CODIFICACIONES_ERRONEAS = ("latin-1", "cp1252")
+MAXIMO_REPARACIONES = 3
+
+COLUMNAS_DE_CALLE = ("calle", "calle_interseccion")
+
+PALABRA_CON_SIGNO_DE_PREGUNTA = re.compile(r"[^\s.,()]*\?[^\s.,()]*")
+PALABRA_EN_MAYUSCULAS = re.compile(r"[A-ZÑÜÁÉÍÓÚÖ]+")
+TERMINACIONES_CON_TILDE = ("CION", "SION", "STION")
+TERMINACION_EXTRANJERA = "SSION"
+PUNTO_COMO_SEPARADOR = re.compile(r"\b([A-ZÑÜÁÉÍÓÚ]{2,})\.(?=\s|,|$)")
+AVENIDA_PEGADA = re.compile(r"\bAV\.(?=[A-ZÑÁÉÍÓÚ])")
+AVENIDA_AL_INICIO = re.compile(r"^AV\.?\s+")
+AVENIDA_AL_FINAL = re.compile(r"\s+AV\.?$")
+DIAGONAL = re.compile(r"\bDIAGONAL (NORTE|SUR)\b")
+ABREVIATURA_SIN_PUNTO = re.compile(r"\b(" + "|".join(sorted(ABREVIATURAS_DE_CALLE - {"AV"})) + r")\b(?!\.)")
+INICIAL = re.compile(r"[A-ZÑ]\.")
+ABREVIATURA_PEGADA = re.compile(r"\b([A-ZÑÜÁÉÍÓÚ]{2,})\.(?=[A-ZÑÜÁÉÍÓÚ])(?!(?:COM|AR|NET|ORG)\b)")
+NUMERO_ROMANO = re.compile(r"(?=[IVXLC]{2,}$)C{0,3}(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})")
+INICIALES_CON_PUNTO = re.compile(r"(?:[A-Z]\.){2,}")
+INICIO_DE_PALABRA = re.compile(r"(?<![\w'’])\w")
+
 
 def leer(nombre: str) -> list[dict[str, str]]:
     with (ORIGEN / nombre).open(encoding="utf-8-sig", newline="") as archivo:
@@ -40,23 +81,108 @@ def puntaje_codificacion(texto: str) -> int:
     return sum(texto.count(x) for x in marcadores) + sum(0x80 <= ord(c) <= 0x9F for c in texto)
 
 
+def decodificar_como_utf8(texto: str, codificacion: str) -> str | None:
+    try:
+        return texto.encode(codificacion).decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return None
+
+
+def reparar_un_nivel(texto: str) -> str | None:
+    candidatos = [decodificar_como_utf8(texto, codificacion) for codificacion in CODIFICACIONES_ERRONEAS]
+    mejoras = [c for c in candidatos if c is not None and puntaje_codificacion(c) < puntaje_codificacion(texto)]
+    return min(mejoras, key=puntaje_codificacion) if mejoras else None
+
+
+def reparar_codificacion(texto: str) -> str:
+    for _ in range(MAXIMO_REPARACIONES):
+        reparado = reparar_un_nivel(texto)
+        if reparado is None:
+            break
+        texto = reparado
+    return texto
+
+
+def corregir_caracteres(texto: str) -> str:
+    return "".join(CARACTERES_CORREGIDOS.get(caracter, caracter) for caracter in texto)
+
+
+def recuperar_letras_perdidas(texto: str) -> str:
+    return PALABRA_CON_SIGNO_DE_PREGUNTA.sub(
+        lambda palabra: PALABRAS_CON_LETRA_PERDIDA.get(palabra.group(), palabra.group()), texto
+    )
+
+
+def acentuar_terminacion(palabra: str) -> str:
+    if len(palabra) > 4 and palabra.endswith(TERMINACIONES_CON_TILDE) and not palabra.endswith(TERMINACION_EXTRANJERA):
+        return palabra[:-3] + "IÓN"
+    return palabra
+
+
+def corregir_palabra(palabra: str) -> str:
+    corregida = ERRORES_DE_TIPEO.get(palabra, palabra)
+    return acentuar_terminacion(PALABRAS_CON_TILDE.get(corregida, corregida))
+
+
+def corregir_frases(texto: str) -> str:
+    for frase, correccion in FRASES_CORREGIDAS.items():
+        texto = re.sub(rf"\b{frase}\b", correccion, texto)
+    return texto
+
+
+def corregir_ortografia(texto: str) -> str:
+    return PALABRA_EN_MAYUSCULAS.sub(lambda palabra: corregir_palabra(palabra.group()), corregir_frases(texto))
+
+
 def limpiar_texto(valor: str | None) -> str | None:
     if valor is None:
         return None
     texto = valor.strip()
     if not texto:
         return None
-    # Algunos orígenes fueron decodificados como latin-1 una o dos veces.
-    for _ in range(2):
-        try:
-            candidato = texto.encode("latin-1").decode("utf-8")
-        except (UnicodeEncodeError, UnicodeDecodeError):
-            break
-        if puntaje_codificacion(candidato) < puntaje_codificacion(texto):
-            texto = candidato
-        else:
-            break
-    return re.sub(r"\s+", " ", texto).strip()
+    texto = recuperar_letras_perdidas(corregir_caracteres(reparar_codificacion(texto)))
+    return corregir_ortografia(re.sub(r"\s+", " ", texto).strip())
+
+
+def separar_abreviaturas(texto: str | None) -> str | None:
+    return ABREVIATURA_PEGADA.sub(r"\1. ", texto) if texto else texto
+
+
+def nombre_lugar(fila: dict[str, str]) -> str | None:
+    nombre = separar_abreviaturas(limpiar_texto(fila["nombre"]))
+    return NOMBRES_CORREGIDOS_POR_LUGAR.get(fila["id"]) or formato_titulo(nombre)
+
+
+def es_sigla(palabra: str) -> bool:
+    nucleo = re.sub(r"^\W+|[^\w.]+$", "", palabra)
+    return (
+        nucleo.rstrip(".") in SIGLAS
+        or bool(NUMERO_ROMANO.fullmatch(nucleo))
+        or bool(INICIALES_CON_PUNTO.fullmatch(nucleo))
+    )
+
+
+def formatear_palabra(palabra: str, es_primera: bool) -> str:
+    if es_sigla(palabra):
+        return palabra
+    minuscula = palabra.lower()
+    if not es_primera and minuscula in CONECTORES:
+        return minuscula
+    return INICIO_DE_PALABRA.sub(lambda letra: letra.group().upper(), minuscula)
+
+
+def formato_titulo(texto: str | None) -> str | None:
+    if not texto or texto != texto.upper():
+        return texto
+    palabras = texto.split(" ")
+    return " ".join(
+        formatear_palabra(palabra, indice == 0 or palabras[indice - 1].endswith("?"))
+        for indice, palabra in enumerate(palabras)
+    )
+
+
+def nombre_barrio(texto: str) -> str:
+    return NOMBRES_OFICIALES_BARRIO.get(clave_texto(texto)) or formato_titulo(texto) or texto
 
 
 def clave_texto(valor: str) -> str:
@@ -96,10 +222,156 @@ def hash_demo(usuario: str, password: str) -> str:
     )
 
 
-def direccion(fila: dict[str, str]) -> str | None:
-    calle = limpiar_texto(fila["calle"])
+def separar_con_comas(calle: str) -> str:
+    texto = calle.replace("..", ".,")
+    return PUNTO_COMO_SEPARADOR.sub(
+        lambda palabra: palabra.group() if palabra.group(1) in ABREVIATURAS_DE_CALLE else palabra.group(1) + ",",
+        texto,
+    )
+
+
+def quitar_avenida(calle: str) -> tuple[str, bool]:
+    sin_avenida = AVENIDA_AL_FINAL.sub("", AVENIDA_AL_INICIO.sub("", calle))
+    return sin_avenida, sin_avenida != calle
+
+
+def preparar_calle(calle: str) -> tuple[str, bool]:
+    con_puntos = ABREVIATURA_SIN_PUNTO.sub(r"\1.", AVENIDA_PEGADA.sub("AV. ", calle.upper()))
+    return quitar_avenida(separar_con_comas(con_puntos))
+
+
+def clave_calle(calle: str) -> tuple[str, ...]:
+    return tuple(sorted(clave_texto(palabra) for palabra in re.findall(r"[^\s.,]+", calle)))
+
+
+def mover_al_inicio(palabras: list[str], finales_movibles: set[str]) -> list[str]:
+    corte = len(palabras)
+    while corte > 0 and palabras[corte - 1] in finales_movibles:
+        corte -= 1
+    return palabras[corte:] + palabras[:corte]
+
+
+def mover_titulos_al_inicio(palabras: list[str]) -> list[str]:
+    return mover_al_inicio(palabras, TITULOS_DE_CALLE)
+
+
+def es_parte_de_titulos(parte: list[str]) -> bool:
+    return all(palabra in TITULOS_DE_CALLE for palabra in parte)
+
+
+def ordenar_partes_con_comas(texto: str) -> list[str]:
+    partes = [parte.split() for parte in texto.split(",") if parte.split()]
+    titulos = [palabra for parte in partes if es_parte_de_titulos(parte) for palabra in parte]
+    nombres = [parte for parte in partes if not es_parte_de_titulos(parte)]
+    if nombres:
+        nombres[0] = mover_al_inicio(nombres[0], PARTICULAS_DE_NOMBRE)
+    return titulos + [palabra for parte in reversed(nombres) for palabra in mover_titulos_al_inicio(parte)]
+
+
+def completa_nombre(palabra: str, nombres_de_pila: set[str]) -> bool:
+    return (
+        palabra in nombres_de_pila
+        or palabra in TITULOS_DE_CALLE
+        or palabra in PARTICULAS_DE_NOMBRE
+        or bool(INICIAL.fullmatch(palabra))
+    )
+
+
+def es_nombre_invertible(palabras: list[str], nombres_de_pila: set[str]) -> bool:
+    return (
+        len(palabras) > 1
+        and palabras[0] not in nombres_de_pila
+        and palabras[0] not in PRIMERAS_PALABRAS_DE_CALLE
+        and "Y" not in palabras
+        and not any(palabra.isdigit() for palabra in palabras)
+    )
+
+
+def poner_nombre_antes_del_apellido(palabras: list[str], nombres_de_pila: set[str]) -> list[str]:
+    if not es_nombre_invertible(palabras, nombres_de_pila):
+        return palabras
+    corte = len(palabras)
+    while corte > 1 and completa_nombre(palabras[corte - 1], nombres_de_pila):
+        corte -= 1
+    complemento = palabras[corte:]
+    titulos = [palabra for palabra in complemento if palabra in TITULOS_DE_CALLE]
+    nombres = [palabra for palabra in complemento if palabra not in TITULOS_DE_CALLE]
+    return titulos + nombres + palabras[:corte]
+
+
+def ordenar_palabras(texto: str, nombres_de_pila: set[str]) -> list[str]:
+    if "," in texto:
+        return ordenar_partes_con_comas(texto)
+    return mover_titulos_al_inicio(poner_nombre_antes_del_apellido(texto.split(), nombres_de_pila))
+
+
+def anteponer_avenida(nombre: str) -> str:
+    primera, _, resto = nombre.partition(" ")
+    if primera.lower() in PREPOSICIONES_TRAS_AVENIDA:
+        primera = primera.lower()
+    return f"Av. {primera} {resto}".strip()
+
+
+def corregir_articulos(nombre: str) -> str:
+    for incorrecto, correcto in APELLIDOS_CON_ARTICULO.items():
+        nombre = nombre.replace(incorrecto, correcto)
+    return nombre
+
+
+def formatear_calle(texto: str, es_avenida: bool, nombres_de_pila: set[str]) -> str:
+    diagonal = DIAGONAL.search(texto)
+    palabras = ordenar_palabras(DIAGONAL.sub("", texto), nombres_de_pila)
+    if diagonal:
+        return formato_titulo(" ".join([diagonal.group(), *palabras]))
+    nombre = corregir_articulos(formato_titulo(" ".join(palabras)))
+    return anteponer_avenida(nombre) if es_avenida else nombre
+
+
+def obtener_nombres_de_pila(textos: list[str]) -> set[str]:
+    partes_de_nombre = [texto.split(",")[1] for texto in textos if texto.count(",") >= 1]
+    return {
+        palabra
+        for parte in partes_de_nombre
+        for palabra in parte.split()
+        if palabra.isalpha() and palabra not in TITULOS_DE_CALLE
+    } | NOMBRES_DE_PILA_ADICIONALES
+
+
+def empieza_con_preposicion(texto: str) -> bool:
+    return texto.split(" ", 1)[0].lower() in PREPOSICIONES_TRAS_AVENIDA
+
+
+def es_avenida_sin_marcar(texto: str, avenidas: set[tuple[str, ...]]) -> bool:
+    return empieza_con_preposicion(texto) and clave_calle(texto) in avenidas
+
+
+def normalizar_calles(lugares: list[dict[str, str]]) -> dict[str, str]:
+    calles = {limpiar_texto(fila[columna]) for fila in lugares for columna in COLUMNAS_DE_CALLE} - {None}
+    preparadas = {calle: preparar_calle(calle) for calle in calles}
+    textos = [texto for texto, _ in preparadas.values()]
+    nombres_de_pila = obtener_nombres_de_pila(textos)
+    orden_con_comas = {clave_calle(texto): texto for texto in textos if "," in texto}
+    avenidas = {clave_calle(texto) for texto, es_avenida in preparadas.values() if es_avenida}
+    return {
+        calle: CALLES_CORREGIDAS.get(clave_texto(calle))
+        or formatear_calle(
+            orden_con_comas.get(clave_calle(texto), texto),
+            es_avenida or es_avenida_sin_marcar(texto, avenidas),
+            nombres_de_pila,
+        )
+        for calle, (texto, es_avenida) in preparadas.items()
+    }
+
+
+def nombre_calle(valor: str | None, calles: dict[str, str]) -> str | None:
+    limpia = limpiar_texto(valor)
+    return calles.get(limpia) if limpia else None
+
+
+def direccion(fila: dict[str, str], calles: dict[str, str]) -> str | None:
+    calle = nombre_calle(fila["calle"], calles)
     altura = limpiar_texto(fila["altura"])
-    interseccion = limpiar_texto(fila["calle_interseccion"])
+    interseccion = nombre_calle(fila["calle_interseccion"], calles)
     if calle and altura:
         return f"{calle} {altura}"
     if calle and interseccion:
@@ -114,18 +386,16 @@ def generar() -> dict[str, int]:
     )
     barrios_raw = leer("barrios.csv")
     fuentes = leer("fuentes.csv")
-    tipos = {f["tipo_id"]: limpiar_texto(f["tipo"]) or "Sin clasificar" for f in leer("tipos.csv")}
+    tipos = {f["tipo_id"]: formato_titulo(limpiar_texto(f["tipo"])) or "Sin clasificar" for f in leer("tipos.csv")}
     lugares_raw = leer("lugares.csv")
+    calles = normalizar_calles(lugares_raw)
 
     barrios: list[tuple[int, str, int]] = []
     barrio_por_clave: dict[str, int] = {}
     mapa_barrio: dict[str, int] = {}
     for fila in barrios_raw:
-        nombre = limpiar_texto(fila["barrio"]) or ""
+        nombre = nombre_barrio(limpiar_texto(fila["barrio"]) or "")
         clave = clave_texto(nombre)
-        # La fuente trae dos codificaciones de Núñez. Ambas se consolidan.
-        if clave == "NUNEZ":
-            nombre = "NÚÑEZ"
         if clave not in barrio_por_clave:
             nuevo_id = len(barrios) + 1
             barrio_por_clave[clave] = nuevo_id
@@ -176,7 +446,7 @@ def generar() -> dict[str, int]:
     omitidos = Counter()
     cargados = 0
     for fila in lugares_raw:
-        nombre = limpiar_texto(fila["nombre"])
+        nombre = nombre_lugar(fila)
         if not nombre:
             omitidos["sin_nombre"] += 1
             continue
@@ -189,7 +459,7 @@ def generar() -> dict[str, int]:
             omitidos["sin_barrio"] += 1
         id_categoria = categorias[(fila["fuente_id"], fila["tipo_id"] or "")][0]
         valores = [
-            int(fila["id"]), nombre, direccion(fila), lat, lon, id_categoria, barrio,
+            int(fila["id"]), nombre, direccion(fila, calles), lat, lon, id_categoria, barrio,
             int(fila["fuente_id"]), f"integrado-{fila['id']}",
         ]
         lineas.append(

@@ -21,7 +21,7 @@ Buscar `TODO` en `informe.md` para encontrar cada punto.
 - [ ] **Secciones 3 y 4:** describir la estructura **original** de cada dataset, antes de
   normalizar. Si se tienen los CSV originales, guardarlos en `database/datasets/originales/`. Con
   eso se completa la "evolución" que pide la consigna (tabla plana → 1FN → 2FN → 3FN).
-- [ ] Normalizar nombres en el ETL (mayúsculas, tildes faltantes como "Agronomia" o
+- [x] Normalizar nombres en el ETL (mayúsculas, tildes faltantes como "Agronomia" o
   "Constitucion", "Boca" → "La Boca") y documentarlo en la sección 15.
 
 ### Diagramas

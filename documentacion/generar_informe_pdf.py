@@ -183,23 +183,43 @@ class DerResumen(Flowable):
         c.setFillColor(NAVY)
         c.drawString(0, 153, "DER — actividad, seguridad y moderación")
         user = caja(0, 83, 100, "USUARIO", ["PK id_usuario", "UK nombre / email", "rol"])
-        checkin = caja(138, 83, 100, "CHECKIN", ["PK id_checkin", "FK usuario", "FK lugar"])
-        favorito = caja(276, 83, 100, "FAVORITO", ["PK/FK usuario", "PK/FK lugar"])
-        sesion = caja(414, 83, 100, "SESIÓN", ["PK id_sesion", "FK usuario", "UK token_hash"])
-        sugerencia = caja(138, 12, 132, "SUGERENCIA_LUGAR", ["PK id_sugerencia", "FK autor / revisor?", "FK lugar_creado? UK"], PALE_GOLD)
-        lugar_ref = caja(324, 12, 100, "LUGAR", ["entidad catálogo"], PALE_GOLD)
+        checkin = caja(207, 83, 100, "CHECKIN", ["PK id_checkin", "FK usuario", "FK lugar"])
+        lugar_ref = caja(414, 83, 100, "LUGAR", ["entidad catálogo"], PALE_GOLD)
+        sesion = caja(0, 12, 100, "SESIÓN", ["PK id_sesion", "FK usuario", "UK token_hash"])
+        favorito = caja(207, 12, 100, "FAVORITO", ["PK/FK usuario", "PK/FK lugar"])
+        sugerencia = caja(382, 12, 132, "SUGERENCIA_LUGAR", ["PK id_sugerencia", "FK autor / revisor?", "FK lugar_creado? UK"], PALE_GOLD)
         unir(user, checkin, "1", "N")
-        unir(checkin, favorito, "N", "N")
-        unir(favorito, sesion, "N", "N")
+        unir(checkin, lugar_ref, "N", "1")
         c.setStrokeColor(MUTED)
-        c.line(50, 83, 160, 64)
-        c.line(270, 38, 324, 38)
-        c.line(374, 64, 374, 83)
+        c.setLineWidth(0.8)
+        # USUARIO 1:N SESIÓN.
+        c.line(25, 83, 25, 64)
+        # FAVORITO resuelve USUARIO N:M LUGAR sin crear relaciones falsas
+        # entre CHECKIN, FAVORITO y SESIÓN.
+        c.line(65, 83, 65, 69)
+        c.line(65, 69, 242, 69)
+        c.line(242, 69, 242, 64)
+        c.line(272, 64, 272, 69)
+        c.line(272, 69, 449, 69)
+        c.line(449, 69, 449, 83)
+        # La sugerencia referencia a sus autores/revisores y, al aprobarse,
+        # puede quedar vinculada como máximo con un LUGAR.
+        c.line(85, 83, 85, 76)
+        c.line(85, 76, 370, 76)
+        c.line(370, 76, 370, 38)
+        c.line(370, 38, 382, 38)
+        c.line(489, 83, 489, 64)
         c.setFont(BOLD, 5.8)
         c.setFillColor(MUTED)
-        c.drawString(52, 68, "autor 1 : N")
-        c.drawString(277, 42, "0..1 : 0..1")
-        c.drawString(378, 69, "LUGAR 1 : N")
+        c.drawString(29, 74, "1")
+        c.drawString(29, 65, "N")
+        c.drawString(69, 71, "1")
+        c.drawRightString(238, 71, "N")
+        c.drawString(276, 71, "N")
+        c.drawRightString(445, 71, "1")
+        c.drawString(91, 78, "autor / revisor 1 : N")
+        c.drawString(493, 74, "0..1")
+        c.drawString(493, 65, "0..1")
         c.setFont(FONT, 6)
         c.drawString(0, 2, "CHECKIN y FAVORITO resuelven las relaciones N:M entre USUARIO y LUGAR.")
         c.restoreState()
@@ -306,16 +326,19 @@ def portada(canvas, doc):
     canvas.setFont(FONT, 10)
     canvas.drawString(24 * mm, h - 134 * mm, "Tecnicatura en Programación Informática — UNSAM")
     canvas.drawString(24 * mm, h - 142 * mm, "Docentes: Gabriel Flores y Rodrigo Casco")
-    canvas.drawString(24 * mm, h - 150 * mm, "Integrantes: completar con los cinco nombres")
-    canvas.drawString(24 * mm, h - 158 * mm, "13 de noviembre de 2026")
+    canvas.setFont(FONT, 9.2)
+    canvas.drawString(24 * mm, h - 150 * mm, "Integrantes: Iván Bonomi, Camila Denise Termine, Nicolás Diez,")
+    canvas.drawString(24 * mm, h - 157 * mm, "Leandro Vázquez y Facundo Casado")
+    canvas.setFont(FONT, 10)
+    canvas.drawString(24 * mm, h - 166 * mm, "13 de noviembre de 2026")
     etiquetas = [("MYSQL 8.4", TEAL), ("HBASE 2.1", GOLD), ("FASTAPI", NAVY), ("EXPO 58", TEAL)]
     x = 24 * mm
     for texto, color in etiquetas:
         canvas.setFillColor(color)
-        canvas.roundRect(x, h - 188 * mm, 34 * mm, 10 * mm, 4 * mm, fill=1, stroke=0)
+        canvas.roundRect(x, h - 194 * mm, 34 * mm, 10 * mm, 4 * mm, fill=1, stroke=0)
         canvas.setFillColor(colors.white)
         canvas.setFont(BOLD, 7.5)
-        canvas.drawCentredString(x + 17 * mm, h - 184.5 * mm, texto)
+        canvas.drawCentredString(x + 17 * mm, h - 190.5 * mm, texto)
         x += 39 * mm
     canvas.setFillColor(MUTED)
     canvas.setFont(FONT, 7.5)
@@ -429,7 +452,7 @@ def main() -> int:
         str(OUTPUT), pagesize=A4, leftMargin=19 * mm, rightMargin=19 * mm,
         topMargin=22 * mm, bottomMargin=18 * mm,
         title="Pasaporte BA — Informe del TP Integrador",
-        author="Equipo Pasaporte BA",
+        author="Iván Bonomi, Camila Denise Termine, Nicolás Diez, Leandro Vázquez y Facundo Casado",
         subject="Modelado relacional MySQL y NoSQL HBase",
     )
     historia = construir_historia(texto, A4[0] - doc.leftMargin - doc.rightMargin)

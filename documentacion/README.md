@@ -2,14 +2,13 @@
 
 | Archivo | Contenido | Estado |
 |---|---|---|
-| `informe.md` | Informe completo y correspondencia con las consignas | Listo; falta reemplazar los nombres de integrantes |
+| `informe.md` | Informe completo y correspondencia con las consignas | Listo |
 | `DER.md` | DER en Mermaid y explicación de cardinalidades | Listo |
 | `../output/pdf/informe_pasaporte_ba.pdf` | Versión final para entregar | Se genera desde `informe.md` |
 | `../backend/dev/resultados/benchmark.csv` | Resultados reproducibles MySQL–HBase | Listo |
 
-Antes de entregar, reemplazar en `informe.md` la línea de integrantes con los cinco nombres y
-volver a generar el PDF. La fecha exacta de descarga histórica de los datasets no se conservó;
-el informe lo declara expresamente y registra la fecha de consulta de las fichas oficiales.
+La fecha exacta de descarga histórica de los datasets no se conservó; el informe lo declara
+expresamente y registra la fecha de consulta de las fichas oficiales.
 
 ## Evidencia técnica
 

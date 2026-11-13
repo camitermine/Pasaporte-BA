@@ -2,7 +2,7 @@
 
 **Materia:** Bases de Datos — Tecnicatura en Programación Informática (UNSAM)
 **Docentes:** Gabriel Flores y Rodrigo Casco
-**Integrantes:** completar con los nombres y apellidos de los cinco integrantes
+**Integrantes:** Iván Bonomi, Camila Denise Termine, Nicolás Diez, Leandro Vázquez y Facundo Casado
 **Fecha de entrega:** 13 de noviembre de 2026
 **Repositorio:** <https://github.com/camitermine/Pasaporte-BA>
 
